@@ -9,10 +9,15 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+import org.springframework.test.context.jdbc.Sql
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @DisplayName("PostRepository 테스트")
+@Sql(
+    scripts = ["/test-cleanup.sql"],
+    executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
+)
 class PostRepositoryTest {
 
     @Autowired
@@ -25,9 +30,7 @@ class PostRepositoryTest {
 
     @BeforeEach
     fun setUp() {
-        // 모든 데이터 삭제 (테스트 격리)
-        postRepository.deleteAll()
-        entityManager.flush()
+        // DB 초기화는 @Sql 어노테이션으로 처리됨
         entityManager.clear()
 
         // 테스트 데이터 생성

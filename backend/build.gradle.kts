@@ -57,4 +57,14 @@ tasks.withType<KotlinCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+
+    // 테스트 순차 실행 (병렬 실행으로 인한 DB 동시성 문제 방지)
+    maxParallelForks = 1
+
+    // 테스트 결과 로깅
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = false
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
 }
