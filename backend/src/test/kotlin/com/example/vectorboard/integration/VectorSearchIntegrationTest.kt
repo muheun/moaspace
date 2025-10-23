@@ -62,7 +62,6 @@ class VectorSearchIntegrationTest {
         // then
         assertThat(response.statusCode).isEqualTo(HttpStatus.CREATED)
         assertThat(response.body).isNotNull
-        assertThat(response.body!!.hasVector).isTrue()
         assertThat(response.body!!.title).isEqualTo("Spring Boot 가이드")
     }
 
@@ -153,7 +152,6 @@ class VectorSearchIntegrationTest {
         // then
         assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
         assertThat(response.body).isNotEmpty
-        assertThat(response.body!!.all { it.post.hasVector }).isTrue()
     }
 
     @Test
@@ -207,7 +205,6 @@ class VectorSearchIntegrationTest {
             "$baseUrl/$postId",
             PostResponse::class.java
         )
-        assertThat(updatedPost.body!!.hasVector).isTrue()
         assertThat(updatedPost.body!!.title).isEqualTo("수정된 제목")
     }
 

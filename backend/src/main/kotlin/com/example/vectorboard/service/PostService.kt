@@ -2,6 +2,7 @@ package com.example.vectorboard.service
 
 import com.example.vectorboard.domain.Post
 import com.example.vectorboard.dto.*
+import com.example.vectorboard.repository.ContentChunkRepository
 import com.example.vectorboard.repository.PostRepository
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
@@ -11,7 +12,10 @@ import org.springframework.transaction.annotation.Transactional
 @Transactional(readOnly = true)
 class PostService(
     private val postRepository: PostRepository,
-    private val vectorService: VectorService
+    private val contentChunkRepository: ContentChunkRepository,
+    private val vectorService: VectorService,
+    private val markdownService: MarkdownService,
+    private val vectorProcessingService: VectorProcessingService
 ) {
 
     /**
@@ -32,26 +36,43 @@ class PostService(
     }
 
     /**
-     * 게시글 생성
+     * 게시글 생성 (비동기)
+     *
+     * 처리 과정:
+     * 1. 마크다운 → 순수 텍스트 변환
+     * 2. Post 엔티티 저장
+     * 3. 즉시 응답 반환 ⚡
+     * 4. 백그라운드에서 벡터 생성 및 청크 저장 (비동기)
      */
     @Transactional
     fun createPost(request: PostCreateRequest): PostResponse {
-        // 게시글 엔티티 생성
+        // 1. 마크다운을 순수 텍스트로 변환
+        val plainText = markdownService.toPlainText(request.content)
+
+        // 2. 게시글 엔티티 생성 및 저장
         val post = Post(
             title = request.title,
             content = request.content,
+            plainContent = plainText,
             author = request.author
         )
 
-        // 내용을 벡터로 변환하여 저장
-        post.contentVector = vectorService.generateEmbedding(request.content)
-
         val savedPost = postRepository.save(post)
+
+        // 3. 백그라운드에서 비동기로 벡터 생성 (즉시 응답!)
+        vectorProcessingService.processChunksAsync(savedPost, plainText)
+
+        // 4. 즉시 응답 반환 (벡터 생성을 기다리지 않음)
         return PostResponse.from(savedPost)
     }
 
     /**
-     * 게시글 수정
+     * 게시글 수정 (비동기)
+     *
+     * 처리 과정:
+     * 1. 제목/내용 업데이트
+     * 2. 즉시 응답 반환 ⚡
+     * 3. 내용 변경 시 백그라운드에서 청크 재생성 (비동기)
      */
     @Transactional
     fun updatePost(id: Long, request: PostUpdateRequest): PostResponse {
@@ -61,10 +82,17 @@ class PostService(
         // 제목 업데이트
         request.title?.let { post.title = it }
 
-        // 내용 업데이트 시 벡터도 재생성
-        request.content?.let {
-            post.content = it
-            post.contentVector = vectorService.generateEmbedding(it)
+        // 내용 업데이트 시 비동기로 청크 재생성
+        request.content?.let { newContent ->
+            // 마크다운을 순수 텍스트로 변환
+            val plainText = markdownService.toPlainText(newContent)
+
+            // Post 업데이트
+            post.content = newContent
+            post.plainContent = plainText
+
+            // 백그라운드에서 비동기로 청크 재생성 (즉시 응답!)
+            vectorProcessingService.reprocessChunksAsync(post, plainText)
         }
 
         val updatedPost = postRepository.save(post)
@@ -83,20 +111,44 @@ class PostService(
     }
 
     /**
-     * 벡터 유사도 기반 검색
+     * 벡터 유사도 기반 검색 (청크 기반)
+     *
+     * 처리 과정:
+     * 1. 검색어 벡터화
+     * 2. ContentChunk에서 유사도 검색
+     * 3. Post 그룹화 + 최대 유사도 점수 계산
+     * 4. 가장 유사한 청크 정보 함께 반환
      */
     fun searchSimilarPosts(request: VectorSearchRequest): List<VectorSearchResult> {
-        // 검색어를 벡터로 변환
+        // 1. 검색어를 벡터로 변환
         val queryVector = vectorService.generateEmbedding(request.query)
         val queryVectorString = vectorService.vectorToString(queryVector)
 
-        // 유사한 게시글 검색
-        val similarPosts = postRepository.findSimilarPosts(queryVectorString, request.limit)
+        // 2. 청크 기반 검색 (Post별 최고 유사도 청크 조회)
+        val chunkResults = contentChunkRepository.findTopChunksByPost(
+            queryVectorString,
+            request.limit
+        )
 
-        return similarPosts.map { post ->
-            VectorSearchResult(
-                post = PostResponse.from(post)
-            )
+        // 3. Post 조회 및 결과 구성
+        return chunkResults.mapNotNull { result ->
+            val post = postRepository.findByIdOrNull(result.getPostId())
+            post?.let {
+                // 가장 유사한 청크 조회
+                val topChunk = contentChunkRepository.findByIdOrNull(result.getChunkId())
+
+                VectorSearchResult(
+                    post = PostResponse.from(it),
+                    similarityScore = result.getScore(),
+                    matchedChunkText = topChunk?.chunkText,
+                    chunkPosition = topChunk?.let { chunk ->
+                        ChunkPosition(
+                            startPos = chunk.startPosition,
+                            endPos = chunk.endPosition
+                        )
+                    }
+                )
+            }
         }
     }
 

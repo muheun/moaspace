@@ -39,7 +39,6 @@ data class PostResponse(
     val title: String,
     val content: String,
     val author: String,
-    val hasVector: Boolean,
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime
 ) {
@@ -50,7 +49,6 @@ data class PostResponse(
                 title = post.title,
                 content = post.content,
                 author = post.author,
-                hasVector = post.contentVector != null,
                 createdAt = post.createdAt,
                 updatedAt = post.updatedAt
             )
@@ -69,9 +67,19 @@ data class VectorSearchRequest(
 )
 
 /**
- * 벡터 검색 결과 DTO
+ * 벡터 검색 결과 DTO (청크 정보 포함)
  */
 data class VectorSearchResult(
     val post: PostResponse,
-    val similarityScore: Double? = null
+    val similarityScore: Double? = null,
+    val matchedChunkText: String? = null,  // 가장 유사한 청크의 텍스트
+    val chunkPosition: ChunkPosition? = null  // 원문에서의 위치
+)
+
+/**
+ * 청크 위치 정보
+ */
+data class ChunkPosition(
+    val startPos: Int,
+    val endPos: Int
 )

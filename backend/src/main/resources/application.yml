@@ -16,6 +16,11 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        # Batch Insert 설정 (성능 향상)
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
     open-in-view: false
 
 server:

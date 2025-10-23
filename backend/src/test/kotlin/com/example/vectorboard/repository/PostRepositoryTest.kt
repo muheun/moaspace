@@ -140,11 +140,10 @@ class PostRepositoryTest {
 
         // when
         val allPosts = postRepository.findAll()
-        val postsWithoutVectors = allPosts.filter { it.contentVector == null }
+        // contentVector 필드가 제거되어 이 테스트는 더 이상 필요 없음
 
         // then
-        assertThat(postsWithoutVectors).hasSize(1)
-        assertThat(postsWithoutVectors[0].title).isEqualTo("벡터 없는 게시글")
+        assertThat(allPosts).isNotEmpty
     }
 
     @Test

@@ -1,9 +1,6 @@
 package com.example.vectorboard.domain
 
-import com.example.vectorboard.config.PGvectorType
-import com.pgvector.PGvector
 import jakarta.persistence.*
-import org.hibernate.annotations.Type
 import java.time.LocalDateTime
 
 @Entity
@@ -19,12 +16,11 @@ class Post(
     @Column(nullable = false, columnDefinition = "TEXT")
     var content: String,
 
+    @Column(name = "plain_content", columnDefinition = "TEXT")
+    var plainContent: String? = null,
+
     @Column(nullable = false, length = 100)
     var author: String,
-
-    @Column(name = "content_vector", columnDefinition = "vector(1536)")
-    @Type(PGvectorType::class)
-    var contentVector: PGvector? = null,
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),

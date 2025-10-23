@@ -29,10 +29,14 @@ dependencies {
     // Kotlin
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
     // PostgreSQL & pgvector
     runtimeOnly("org.postgresql:postgresql")
     implementation("com.pgvector:pgvector:0.1.4")
+
+    // Markdown 처리
+    implementation("com.vladsch.flexmark:flexmark-all:0.64.8")
 
     // 개발 도구
     developmentOnly("org.springframework.boot:spring-boot-devtools")

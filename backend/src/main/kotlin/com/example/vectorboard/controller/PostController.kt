@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/posts")
-@CrossOrigin(origins = ["http://localhost:3000"]) // Next.js 프론트엔드 허용
 class PostController(
     private val postService: PostService
 ) {
