@@ -119,7 +119,7 @@ class PostService(
      * 3. Post 그룹화 + 최대 유사도 점수 계산
      * 4. 가장 유사한 청크 정보 함께 반환
      */
-    fun searchSimilarPosts(request: VectorSearchRequest): List<VectorSearchResult> {
+    fun searchSimilarPosts(request: PostVectorSearchRequest): List<PostVectorSearchResult> {
         // 1. 검색어를 벡터로 변환
         val queryVector = vectorService.generateEmbedding(request.query)
         val queryVectorString = vectorService.vectorToString(queryVector)
@@ -137,7 +137,7 @@ class PostService(
                 // 가장 유사한 청크 조회
                 val topChunk = contentChunkRepository.findByIdOrNull(result.getChunkId())
 
-                VectorSearchResult(
+                PostVectorSearchResult(
                     post = PostResponse.from(it),
                     similarityScore = result.getScore(),
                     matchedChunkText = topChunk?.chunkText,

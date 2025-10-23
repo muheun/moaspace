@@ -65,7 +65,7 @@ class PostController(
      * 벡터 유사도 기반 검색
      */
     @PostMapping("/search/vector")
-    fun searchByVector(@Valid @RequestBody request: VectorSearchRequest): ResponseEntity<List<VectorSearchResult>> {
+    fun searchByVector(@Valid @RequestBody request: PostVectorSearchRequest): ResponseEntity<List<PostVectorSearchResult>> {
         val results = postService.searchSimilarPosts(request)
         return ResponseEntity.ok(results)
     }

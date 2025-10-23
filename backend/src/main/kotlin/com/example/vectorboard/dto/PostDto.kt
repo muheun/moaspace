@@ -57,9 +57,9 @@ data class PostResponse(
 }
 
 /**
- * 벡터 검색 요청 DTO
+ * Post 벡터 검색 요청 DTO
  */
-data class VectorSearchRequest(
+data class PostVectorSearchRequest(
     @field:NotBlank(message = "검색어는 필수입니다")
     val query: String,
 
@@ -67,9 +67,9 @@ data class VectorSearchRequest(
 )
 
 /**
- * 벡터 검색 결과 DTO (청크 정보 포함)
+ * Post 벡터 검색 결과 DTO (청크 정보 포함)
  */
-data class VectorSearchResult(
+data class PostVectorSearchResult(
     val post: PostResponse,
     val similarityScore: Double? = null,
     val matchedChunkText: String? = null,  // 가장 유사한 청크의 텍스트
