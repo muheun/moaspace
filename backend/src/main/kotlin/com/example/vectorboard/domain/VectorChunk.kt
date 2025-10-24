@@ -3,7 +3,9 @@ package com.example.vectorboard.domain
 import com.example.vectorboard.config.PGvectorType
 import com.pgvector.PGvector
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.annotations.Type
+import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
 
 /**
@@ -81,10 +83,12 @@ class VectorChunk(
 
     // ========================================
     // 추가 메타데이터 (JSONB)
+    // JSON Object 형식으로 저장
     // ========================================
 
-    @Column(name = "metadata", columnDefinition = "JSONB")
-    var metadata: String? = null,
+    @Column(name = "metadata", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    var metadata: Map<String, Any>? = null,
 
     // ========================================
     // 타임스탬프

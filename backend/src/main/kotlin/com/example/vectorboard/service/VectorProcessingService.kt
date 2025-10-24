@@ -1,22 +1,25 @@
 package com.example.vectorboard.service
 
-import com.example.vectorboard.domain.ContentChunk
-import com.example.vectorboard.domain.Post
-import com.example.vectorboard.repository.ContentChunkRepository
+import com.example.vectorboard.domain.VectorChunk
+import com.example.vectorboard.event.VectorIndexingRequestedEvent
+import com.example.vectorboard.repository.VectorChunkRepository
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
+import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 벡터 처리 비동기 서비스
- * 백그라운드에서 벡터 생성 및 청크 저장을 처리
+ * 범용 벡터 처리 서비스
+ *
+ * 모든 엔티티(Post, Product, Comment 등)의 벡터 생성 및 청크 저장을 백그라운드에서 처리합니다.
+ * VectorIndexingRequestedEvent를 수신하여 비동기로 VectorChunk를 생성합니다.
  */
 @Service
 class VectorProcessingService(
-    private val contentChunkRepository: ContentChunkRepository,
+    private val vectorChunkRepository: VectorChunkRepository,
     private val vectorService: VectorService,
     private val chunkingService: ChunkingService
 ) {
@@ -24,69 +27,98 @@ class VectorProcessingService(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
-     * 비동기로 청크 생성 및 벡터 저장
+     * 벡터 인덱싱 요청 이벤트 리스너
      *
-     * @Async를 사용하여 별도 스레드에서 실행
-     * 트랜잭션을 새로 시작 (REQUIRES_NEW)
+     * VectorIndexingRequestedEvent를 수신하여 백그라운드에서 벡터 생성 및 저장을 처리합니다.
+     *
+     * 처리 과정:
+     * 1. 각 필드별로 텍스트 청킹
+     * 2. 병렬로 벡터 생성
+     * 3. VectorChunk 엔티티로 저장
+     *
+     * @param event 벡터 인덱싱 요청 이벤트
      */
+    @EventListener
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun processChunksAsync(post: Post, plainContent: String) {
+    fun handleVectorIndexingRequest(event: VectorIndexingRequestedEvent) {
         try {
-            logger.info("🔵 비동기 벡터 생성 시작: Post ID=${post.id}, plainContent 길이=${plainContent.length}")
+            logger.info("🔵 [범용 인덱싱] 이벤트 수신: namespace=${event.namespace}, entity=${event.entity}, recordKey=${event.recordKey}, fields=${event.fields.keys}")
+
+            // 각 필드별로 처리
+            event.fields.forEach { (fieldName, fieldValue) ->
+                processFieldVectorization(
+                    namespace = event.namespace,
+                    entity = event.entity,
+                    recordKey = event.recordKey,
+                    fieldName = fieldName,
+                    fieldValue = fieldValue,
+                    metadata = event.metadata
+                )
+            }
+
+            logger.info("✅ [범용 인덱싱] 완료: namespace=${event.namespace}, entity=${event.entity}, recordKey=${event.recordKey}")
+
+        } catch (e: Exception) {
+            logger.error("❌ [범용 인덱싱] 실패: namespace=${event.namespace}, entity=${event.entity}, recordKey=${event.recordKey}, error=${e.message}", e)
+        }
+    }
+
+    /**
+     * 개별 필드의 벡터화 처리
+     *
+     * @param namespace 네임스페이스
+     * @param entity 엔티티 타입
+     * @param recordKey 레코드 식별자
+     * @param fieldName 필드명
+     * @param fieldValue 필드 값 (텍스트)
+     * @param metadata 추가 메타데이터
+     */
+    private fun processFieldVectorization(
+        namespace: String,
+        entity: String,
+        recordKey: String,
+        fieldName: String,
+        fieldValue: String,
+        metadata: Map<String, Any>?
+    ) {
+        try {
+            logger.debug("🟡 [필드 벡터화] 시작: $entity.$fieldName (recordKey=$recordKey, 텍스트 길이=${fieldValue.length})")
 
             // 1. 텍스트 청킹
-            val chunks = chunkingService.chunkDocument(plainContent)
-            logger.info("🟢 청크 생성 완료: ${chunks.size}개 (Post ID=${post.id})")
+            val chunks = chunkingService.chunkDocument(fieldValue)
+            logger.debug("🟢 [청킹 완료] $entity.$fieldName: ${chunks.size}개 청크 생성")
 
             // 2. 병렬로 벡터 생성
-            val contentChunks = runBlocking {
+            val vectorChunks = runBlocking {
                 chunks.map { chunk ->
                     async(Dispatchers.IO) {
                         val vector = vectorService.generateEmbedding(chunk.text)
 
-                        ContentChunk(
-                            post = post,
+                        VectorChunk(
+                            namespace = namespace,
+                            entity = entity,
+                            recordKey = recordKey,
+                            fieldName = fieldName,
                             chunkText = chunk.text,
                             chunkVector = vector,
                             chunkIndex = chunk.index,
                             startPosition = chunk.startPos,
-                            endPosition = chunk.endPos
+                            endPosition = chunk.endPos,
+                            metadata = metadata
                         )
                     }
                 }.awaitAll()
             }
 
             // 3. Batch Insert
-            contentChunkRepository.saveAll(contentChunks)
+            vectorChunkRepository.saveAll(vectorChunks)
 
-            logger.info("✅ 비동기 벡터 생성 완료: Post ID=${post.id}, ${chunks.size}개 청크 DB 저장 완료")
-
-        } catch (e: Exception) {
-            logger.error("❌ 비동기 벡터 생성 실패: Post ID=${post.id}, error=${e.message}", e)
-            // 예외를 던지지 않고 로깅만 (비동기 작업 실패가 전체 요청을 실패시키지 않도록)
-        }
-    }
-
-    /**
-     * 비동기로 청크 재생성 (업데이트 시)
-     * 기존 청크를 삭제하고 새로 생성
-     */
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun reprocessChunksAsync(post: Post, plainContent: String) {
-        try {
-            logger.info("비동기 청크 재생성 시작: Post ID=${post.id}")
-
-            // 1. 기존 청크 삭제
-            contentChunkRepository.deleteByPost(post)
-            logger.debug("기존 청크 삭제 완료")
-
-            // 2. 새 청크 생성
-            processChunksAsync(post, plainContent)
+            logger.debug("✅ [필드 벡터화] 완료: $entity.$fieldName (${chunks.size}개 청크 DB 저장)")
 
         } catch (e: Exception) {
-            logger.error("비동기 청크 재생성 실패: Post ID=${post.id}, error=${e.message}", e)
+            logger.error("❌ [필드 벡터화] 실패: $entity.$fieldName (recordKey=$recordKey), error=${e.message}", e)
+            throw e
         }
     }
 }

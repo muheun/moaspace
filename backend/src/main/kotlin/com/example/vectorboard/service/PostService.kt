@@ -15,7 +15,7 @@ class PostService(
     private val contentChunkRepository: ContentChunkRepository,
     private val vectorService: VectorService,
     private val markdownService: MarkdownService,
-    private val vectorProcessingService: VectorProcessingService
+    private val postVectorService: PostVectorService
 ) {
 
     /**
@@ -60,7 +60,7 @@ class PostService(
         val savedPost = postRepository.save(post)
 
         // 3. 백그라운드에서 비동기로 벡터 생성 (즉시 응답!)
-        vectorProcessingService.processChunksAsync(savedPost, plainText)
+        postVectorService.processChunksAsync(savedPost, plainText)
 
         // 4. 즉시 응답 반환 (벡터 생성을 기다리지 않음)
         return PostResponse.from(savedPost)
@@ -92,7 +92,7 @@ class PostService(
             post.plainContent = plainText
 
             // 백그라운드에서 비동기로 청크 재생성 (즉시 응답!)
-            vectorProcessingService.reprocessChunksAsync(post, plainText)
+            postVectorService.reprocessChunksAsync(post, plainText)
         }
 
         val updatedPost = postRepository.save(post)
