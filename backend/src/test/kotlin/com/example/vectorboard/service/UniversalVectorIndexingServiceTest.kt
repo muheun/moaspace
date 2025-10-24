@@ -251,4 +251,188 @@ class UniversalVectorIndexingServiceTest {
         service.deleteEntity("cms", "articles", "article-123")
         assertThat(vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc("cms", "articles", "article-123")).isEmpty()
     }
+
+    // ========================================
+    // User Story 1: 다양한 엔티티에 벡터 검색 추가
+    // ========================================
+
+    @Test
+    @DisplayName("[US1] Scenario 1 - Product 테이블 10개 레코드, 스마트폰 검색 시 유사도 순 반환")
+    fun `US1_Scenario1 should return products sorted by similarity when searching for smartphone`() {
+        // Given: 10개의 Product 레코드 생성
+        val products = listOf(
+            "갤럭시 스마트폰 최신 모델입니다",
+            "아이폰 스마트폰 프리미엄 제품입니다",
+            "노트북 컴퓨터 고성능 제품입니다",
+            "태블릿 PC 휴대용 기기입니다",
+            "스마트워치 웨어러블 디바이스입니다",
+            "무선 이어폰 블루투스 제품입니다",
+            "스마트폰 케이스 액세서리입니다",
+            "스마트폰 충전기 고속 충전 지원합니다",
+            "게이밍 마우스 RGB 조명 지원합니다",
+            "키보드 기계식 스위치 제품입니다"
+        )
+
+        products.forEachIndexed { index, description ->
+            service.indexEntity(
+                VectorIndexRequest(
+                    namespace = "shop_db",
+                    entity = "products",
+                    recordKey = "product-${index + 1}",
+                    fields = mapOf(
+                        "name" to "제품 ${index + 1}",
+                        "description" to description
+                    ),
+                    metadata = null
+                )
+            )
+        }
+        Thread.sleep(3000) // 비동기 처리 대기 (10개 제품)
+
+        // When: "스마트폰" 검색
+        val searchRequest = VectorSearchRequest(
+            query = "스마트폰",
+            namespace = "shop_db",
+            entity = "products",
+            fieldName = null,
+            limit = 10
+        )
+        val results = service.search(searchRequest)
+
+        // Then: 결과가 유사도 순으로 정렬되어 반환됨
+        assertThat(results).isNotEmpty
+        assertThat(results.size).isLessThanOrEqualTo(10)
+
+        // 유사도 점수가 내림차순으로 정렬되었는지 확인
+        for (i in 0 until results.size - 1) {
+            assertThat(results[i].similarityScore).isGreaterThanOrEqualTo(results[i + 1].similarityScore)
+        }
+
+        // 모든 결과가 products 엔티티에서만 나왔는지 확인
+        assertThat(results.all { it.entity == "products" }).isTrue()
+        assertThat(results.all { it.namespace == "shop_db" }).isTrue()
+    }
+
+    @Test
+    @DisplayName("[US1] Scenario 2 - posts와 products 모두 인덱싱, posts만 검색 시 products 제외")
+    fun `US1_Scenario2 should return only posts when searching in posts entity`() {
+        // Given: posts와 products 모두 인덱싱
+        // Posts 데이터
+        service.indexEntity(
+            VectorIndexRequest(
+                namespace = "vector_ai",
+                entity = "posts",
+                recordKey = "post-1",
+                fields = mapOf(
+                    "title" to "Spring Boot 가이드",
+                    "content" to "Spring Boot 프레임워크 사용법"
+                ),
+                metadata = null
+            )
+        )
+        service.indexEntity(
+            VectorIndexRequest(
+                namespace = "vector_ai",
+                entity = "posts",
+                recordKey = "post-2",
+                fields = mapOf(
+                    "title" to "Kotlin 튜토리얼",
+                    "content" to "Kotlin 언어 학습 자료"
+                ),
+                metadata = null
+            )
+        )
+
+        // Products 데이터
+        service.indexEntity(
+            VectorIndexRequest(
+                namespace = "vector_ai",
+                entity = "products",
+                recordKey = "product-1",
+                fields = mapOf(
+                    "name" to "Spring Boot 책",
+                    "description" to "Spring Boot 학습 도서"
+                ),
+                metadata = null
+            )
+        )
+
+        Thread.sleep(2000) // 비동기 처리 대기
+
+        // When: posts 엔티티만 검색
+        val searchRequest = VectorSearchRequest(
+            query = "Spring Boot",
+            namespace = "vector_ai",
+            entity = "posts",
+            fieldName = null,
+            limit = 10
+        )
+        val results = service.search(searchRequest)
+
+        // Then: posts 결과만 반환되고 products는 제외됨
+        assertThat(results).isNotEmpty
+        assertThat(results.all { it.entity == "posts" }).isTrue()
+        assertThat(results.none { it.entity == "products" }).isTrue()
+        assertThat(results.all { it.namespace == "vector_ai" }).isTrue()
+    }
+
+    @Test
+    @DisplayName("[US1] Scenario 3 - comments 테이블 추가 시 코드 변경 없이 즉시 인덱싱 및 검색")
+    fun `US1_Scenario3 should index and search comments without code changes`() {
+        // Given: 새로운 comments 엔티티 추가 (코드 변경 없이)
+        service.indexEntity(
+            VectorIndexRequest(
+                namespace = "forum_db",
+                entity = "comments",
+                recordKey = "comment-1",
+                fields = mapOf("content" to "이 게시글 정말 유익하네요!"),
+                metadata = mapOf("author" to "user1")
+            )
+        )
+        service.indexEntity(
+            VectorIndexRequest(
+                namespace = "forum_db",
+                entity = "comments",
+                recordKey = "comment-2",
+                fields = mapOf("content" to "좋은 정보 감사합니다."),
+                metadata = mapOf("author" to "user2")
+            )
+        )
+        service.indexEntity(
+            VectorIndexRequest(
+                namespace = "forum_db",
+                entity = "comments",
+                recordKey = "comment-3",
+                fields = mapOf("content" to "도움이 많이 되었습니다."),
+                metadata = mapOf("author" to "user3")
+            )
+        )
+
+        Thread.sleep(2000) // 비동기 처리 대기
+
+        // When: comments 검색
+        val searchRequest = VectorSearchRequest(
+            query = "유익한 정보",
+            namespace = "forum_db",
+            entity = "comments",
+            fieldName = null,
+            limit = 5
+        )
+        val results = service.search(searchRequest)
+
+        // Then: comments가 정상적으로 인덱싱되고 검색됨
+        assertThat(results).isNotEmpty
+        assertThat(results.all { it.entity == "comments" }).isTrue()
+        assertThat(results.all { it.namespace == "forum_db" }).isTrue()
+
+        // 메타데이터도 정상적으로 저장되었는지 확인
+        val chunks = vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc(
+            "forum_db",
+            "comments",
+            "comment-1"
+        )
+        assertThat(chunks).isNotEmpty
+        assertThat(chunks.first().metadata).isNotNull
+        assertThat(chunks.first().metadata!!["author"]).isEqualTo("user1")
+    }
 }

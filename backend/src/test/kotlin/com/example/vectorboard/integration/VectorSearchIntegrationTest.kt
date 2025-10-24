@@ -40,7 +40,8 @@ class VectorSearchIntegrationTest {
     @BeforeEach
     fun setUp() {
         // DB 초기화는 @Sql 어노테이션으로 처리됨
-        // 추가적인 setUp 로직이 필요하면 여기에 작성
+        // 비동기 작업 완료 대기
+        Thread.sleep(500)
     }
 
     @Test
@@ -59,6 +60,9 @@ class VectorSearchIntegrationTest {
             request,
             PostResponse::class.java
         )
+
+        // 비동기 벡터 생성 대기
+        Thread.sleep(1500)
 
         // then
         assertThat(response.statusCode).isEqualTo(HttpStatus.CREATED)
@@ -80,6 +84,9 @@ class VectorSearchIntegrationTest {
         posts.forEach { request ->
             restTemplate.postForEntity(baseUrl, request, PostResponse::class.java)
         }
+
+        // 비동기 벡터 생성 대기
+        Thread.sleep(3000)
 
         // when - "Spring" 관련 검색
         val searchRequest = PostVectorSearchRequest(query = "Spring 프레임워크", limit = 3)
@@ -122,6 +129,9 @@ class VectorSearchIntegrationTest {
             restTemplate.postForEntity(baseUrl, request, PostResponse::class.java)
         }
 
+        // 비동기 벡터 생성 대기
+        Thread.sleep(2500)
+
         // when - limit=3으로 검색
         val searchRequest = PostVectorSearchRequest(query = "내용", limit = 3)
         val response = restTemplate.postForEntity(
@@ -141,6 +151,9 @@ class VectorSearchIntegrationTest {
         // given
         val request = PostCreateRequest("테스트 게시글", "테스트 내용", "작성자")
         restTemplate.postForEntity(baseUrl, request, PostResponse::class.java)
+
+        // 비동기 벡터 생성 대기
+        Thread.sleep(1000)
 
         // when
         val searchRequest = PostVectorSearchRequest(query = "테스트", limit = 10)
@@ -168,6 +181,9 @@ class VectorSearchIntegrationTest {
         techPosts.forEach { request ->
             restTemplate.postForEntity(baseUrl, request, PostResponse::class.java)
         }
+
+        // 비동기 벡터 생성 대기
+        Thread.sleep(2000)
 
         // when - "인공지능" 관련 검색
         val searchRequest = PostVectorSearchRequest(query = "AI와 머신러닝", limit = 2)
@@ -201,6 +217,9 @@ class VectorSearchIntegrationTest {
         )
         restTemplate.put("$baseUrl/$postId", updateRequest)
 
+        // 비동기 벡터 재생성 대기
+        Thread.sleep(1500)
+
         // then - 수정된 게시글 조회
         val updatedPost = restTemplate.getForEntity(
             "$baseUrl/$postId",
@@ -226,6 +245,7 @@ class VectorSearchIntegrationTest {
         // Update
         val updateRequest = mapOf("title" to "수정된 제목", "content" to "수정된 내용")
         restTemplate.put("$baseUrl/$postId", updateRequest)
+        Thread.sleep(1000) // 비동기 벡터 재생성 대기
         val updatedPost = restTemplate.getForEntity("$baseUrl/$postId", PostResponse::class.java)
         assertThat(updatedPost.body!!.title).isEqualTo("수정된 제목")
 
