@@ -75,6 +75,10 @@ tasks.withType<Test> {
     // 테스트 순차 실행 (병렬 실행으로 인한 DB 동시성 문제 방지)
     maxParallelForks = 1
 
+    // MPNet 모델(1.0GB) 로딩을 위한 메모리 증가
+    minHeapSize = "1024m"
+    maxHeapSize = "2048m"
+
     // 테스트 결과 로깅
     testLogging {
         events("passed", "skipped", "failed")

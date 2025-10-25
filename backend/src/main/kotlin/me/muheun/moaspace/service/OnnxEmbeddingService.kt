@@ -20,13 +20,14 @@ private val logger = LoggerFactory.getLogger(OnnxEmbeddingService::class.java)
 /**
  * ONNX Runtime 기반 임베딩 서비스
  *
- * MiniLM-L12-v2 ONNX 모델을 사용하여 실제 의미 기반 벡터 임베딩을 생성합니다.
+ * multilingual-e5-base ONNX 모델을 사용하여 실제 의미 기반 벡터 임베딩을 생성합니다.
  *
  * 주요 기능:
  * - HuggingFace Tokenizer를 사용한 토큰화
  * - ONNX Runtime을 통한 모델 추론
  * - Mean Pooling으로 문장 임베딩 생성
  * - L2 정규화로 코사인 유사도 최적화
+ * - 100개 언어 지원 (다국어 최적화)
  *
  * @property ortSession ONNX Runtime 세션
  * @property tokenizerPath HuggingFace Tokenizer 경로
@@ -42,7 +43,7 @@ class OnnxEmbeddingService(
 ) : VectorEmbeddingService {
 
     private lateinit var tokenizer: HuggingFaceTokenizer
-    private val embeddingDimension = 384 // MiniLM-L12-v2
+    private val embeddingDimension = 768 // multilingual-e5-base (100개 언어 지원)
 
     @PostConstruct
     fun init() {
@@ -79,7 +80,7 @@ class OnnxEmbeddingService(
      * 5. L2 정규화
      *
      * @param text 벡터화할 텍스트
-     * @return PGvector 객체 (384차원, L2 정규화됨)
+     * @return PGvector 객체 (768차원, L2 정규화됨)
      * @throws IllegalArgumentException 빈 문자열 또는 null 입력
      * @throws RuntimeException ONNX 추론 실패
      */
@@ -104,19 +105,15 @@ class OnnxEmbeddingService(
             val batchInputIds = arrayOf(inputIds)
             val batchAttentionMask = arrayOf(attentionMask)
 
-            // token_type_ids (모두 0)
-            val tokenTypeIds = arrayOf(LongArray(inputIds.size))
-
             // 3. ONNX 텐서 생성
             val inputIdsTensor = OnnxTensor.createTensor(ortEnvironment, batchInputIds)
             val attentionMaskTensor = OnnxTensor.createTensor(ortEnvironment, batchAttentionMask)
-            val tokenTypeIdsTensor = OnnxTensor.createTensor(ortEnvironment, tokenTypeIds)
 
             // 4. ONNX 추론
+            // E5는 XLM-RoBERTa 기반 아키텍처이므로 token_type_ids가 필요 없음
             val inputs = mapOf(
                 "input_ids" to inputIdsTensor,
-                "attention_mask" to attentionMaskTensor,
-                "token_type_ids" to tokenTypeIdsTensor
+                "attention_mask" to attentionMaskTensor
             )
 
             val result = ortSession.run(inputs)
@@ -143,7 +140,6 @@ class OnnxEmbeddingService(
                 result.close()
                 inputIdsTensor.close()
                 attentionMaskTensor.close()
-                tokenTypeIdsTensor.close()
             }
 
         } catch (e: IllegalArgumentException) {

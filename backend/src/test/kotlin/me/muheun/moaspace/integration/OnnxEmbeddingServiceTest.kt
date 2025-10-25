@@ -21,6 +21,10 @@ import kotlin.math.sqrt
  * **Independent Test 기준**:
  * - "안녕하세요"와 "Hello"의 유사도가 높아야 함 (≥ 0.7)
  * - "컴퓨터"와 "사과"의 유사도가 낮아야 함 (< 0.5)
+ *
+ * **E5-base 모델 사용**:
+ * - 768차원 벡터 (multilingual-e5-base)
+ * - 100개 언어 지원 (다국어 최적화)
  */
 @SpringBootTest
 @DisplayName("ONNX 임베딩 서비스 통합 테스트 (실제 모델 사용)")
@@ -53,8 +57,8 @@ class OnnxEmbeddingServiceTest {
     }
 
     @Test
-    @DisplayName("T022: 한국어 텍스트를 384차원 벡터로 임베딩하고 L2 norm이 1.0이어야 한다")
-    fun `should embed Korean text to 384-dimensional vector with L2 norm 1_0`() {
+    @DisplayName("T022: 한국어 텍스트를 768차원 벡터로 임베딩하고 L2 norm이 1.0이어야 한다")
+    fun `should embed Korean text to 768-dimensional vector with L2 norm 1_0`() {
         // given
         val text = "안녕하세요"
 
@@ -64,7 +68,7 @@ class OnnxEmbeddingServiceTest {
 
         // then
         assertThat(embedding).isNotNull
-        assertThat(embeddingArray.size).isEqualTo(384) // MiniLM-L12-v2는 384차원
+        assertThat(embeddingArray.size).isEqualTo(768) // E5-base는 768차원
 
         // L2 norm = 1.0 ± 0.0001 검증
         val norm = sqrt(embeddingArray.sumOf { (it * it).toDouble() })
@@ -99,6 +103,7 @@ class OnnxEmbeddingServiceTest {
 
         // then
         val similarity = cosineSimilarity(embedding1, embedding2)
+        println("📊 \"$text1\" vs \"$text2\" 유사도: $similarity")
         assertThat(similarity).isGreaterThanOrEqualTo(0.8)
     }
 
@@ -131,7 +136,7 @@ class OnnxEmbeddingServiceTest {
 
         // then
         val similarity = cosineSimilarity(koreanEmbedding, englishEmbedding)
-        assertThat(similarity).isGreaterThanOrEqualTo(0.7) // MiniLM-L12-v2는 다국어 지원
+        assertThat(similarity).isGreaterThanOrEqualTo(0.7) // E5-base는 100개 언어 지원
     }
 
     @Test
@@ -145,7 +150,7 @@ class OnnxEmbeddingServiceTest {
         val embeddingArray = embedding.toFloatArray()
 
         assertThat(embedding).isNotNull
-        assertThat(embeddingArray.size).isEqualTo(384)
+        assertThat(embeddingArray.size).isEqualTo(768)
 
         // L2 norm 검증
         val norm = sqrt(embeddingArray.sumOf { (it * it).toDouble() })
@@ -182,7 +187,7 @@ class OnnxEmbeddingServiceTest {
 
         // then
         assertThat(embedding).isNotNull
-        assertThat(embeddingArray.size).isEqualTo(384)
+        assertThat(embeddingArray.size).isEqualTo(768)
     }
 
     @Test

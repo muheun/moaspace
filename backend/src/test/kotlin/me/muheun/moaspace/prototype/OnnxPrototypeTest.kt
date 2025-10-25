@@ -1,0 +1,158 @@
+package me.muheun.moaspace.prototype
+
+import me.muheun.moaspace.service.VectorEmbeddingService
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.within
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import kotlin.math.sqrt
+
+/**
+ * T002: DJL + ONNX Runtime 프로토타입 구현 및 검증
+ *
+ * MPNet-base-v2 모델(768차원)을 사용하여 임베딩 생성을 빠르게 검증합니다.
+ *
+ * **Acceptance Criteria:**
+ * - "안녕하세요" 텍스트를 768차원 벡터로 변환
+ * - L2 norm ≈ 1.0 검증
+ * - 성능 측정 (50ms 이내 목표)
+ * - 형태소 분석 기본 동작 확인
+ */
+@SpringBootTest
+@DisplayName("[T002] ONNX 프로토타입 테스트 - MPNet 768차원")
+class OnnxPrototypeTest {
+
+    @Autowired
+    private lateinit var embeddingService: VectorEmbeddingService
+
+    @Test
+    @DisplayName("AC1: '안녕하세요'를 768차원 벡터로 임베딩하고 L2 norm이 1.0이어야 한다")
+    fun `should embed hello in Korean to 768-dimensional vector with L2 norm 1_0`() {
+        // given
+        val text = "안녕하세요"
+
+        // when
+        val embedding = embeddingService.generateEmbedding(text)
+        val embeddingArray = embedding.toArray().map { it.toFloat() }.toFloatArray()
+
+        // then
+        println("📊 [AC1] 임베딩 결과:")
+        println("  - 텍스트: \"$text\"")
+        println("  - 벡터 차원: ${embeddingArray.size}")
+        println("  - 첫 5개 값: ${embeddingArray.take(5)}")
+
+        assertThat(embeddingArray.size).isEqualTo(768) // MPNet-base-v2는 768차원
+
+        // L2 norm = 1.0 ± 0.0001 검증
+        val norm = sqrt(embeddingArray.sumOf { (it * it).toDouble() })
+        println("  - L2 norm: $norm")
+
+        assertThat(norm).isCloseTo(1.0, within(0.0001))
+    }
+
+    @Test
+    @DisplayName("AC2: 성능 테스트 - 단일 문장 임베딩이 50ms 이내여야 한다 (MPNet 기준)")
+    fun `performance test - single sentence should complete within 50ms`() {
+        // given
+        val text = "Spring Boot는 Java 기반의 강력한 웹 프레임워크입니다."
+
+        // warm-up (모델 로딩 및 JIT 최적화)
+        repeat(5) {
+            embeddingService.generateEmbedding(text)
+        }
+
+        // when - 50회 반복 테스트
+        val times = mutableListOf<Long>()
+        repeat(50) {
+            val start = System.currentTimeMillis()
+            embeddingService.generateEmbedding(text)
+            val end = System.currentTimeMillis()
+            times.add(end - start)
+        }
+
+        // then
+        val avgTime = times.average()
+        val minTime = times.minOrNull() ?: 0
+        val maxTime = times.maxOrNull() ?: 0
+
+        println("📊 [AC2] 성능 테스트 결과 (단일 문장, MPNet 768차원)")
+        println("  - 평균 시간: ${avgTime}ms")
+        println("  - 최소 시간: ${minTime}ms")
+        println("  - 최대 시간: ${maxTime}ms")
+        println("  - 목표: 50ms 이내")
+
+        // MPNet은 MiniLM보다 더 크므로 50ms 목표 (30ms에서 완화)
+        assertThat(avgTime).describedAs("평균 임베딩 시간이 50ms를 초과했습니다")
+            .isLessThanOrEqualTo(50.0)
+    }
+
+    @Test
+    @DisplayName("AC3: 의미적으로 유사한 텍스트는 높은 유사도를 가져야 한다")
+    fun `should have high similarity for semantically similar texts`() {
+        // given
+        val text1 = "Python 프로그래밍"
+        val text2 = "파이썬 코딩"
+
+        // when
+        val embedding1 = embeddingService.generateEmbedding(text1)
+        val embedding2 = embeddingService.generateEmbedding(text2)
+
+        // then
+        val similarity = cosineSimilarity(
+            embedding1.toArray().map { it.toFloat() }.toFloatArray(),
+            embedding2.toArray().map { it.toFloat() }.toFloatArray()
+        )
+
+        println("📊 [AC3] 의미 유사도 테스트:")
+        println("  - 텍스트1: \"$text1\"")
+        println("  - 텍스트2: \"$text2\"")
+        println("  - 코사인 유사도: $similarity")
+        println("  - 목표: ≥ 0.7")
+
+        // MPNet은 더 높은 품질의 임베딩을 생성하므로 0.7 이상 기대
+        assertThat(similarity).isGreaterThanOrEqualTo(0.7)
+    }
+
+    @Test
+    @DisplayName("AC4: 다국어 텍스트 (한국어-영어)의 유사도를 검증한다")
+    fun `should handle multilingual texts Korean and English`() {
+        // given
+        val koreanText = "안녕하세요"
+        val englishText = "Hello"
+
+        // when
+        val koreanEmbedding = embeddingService.generateEmbedding(koreanText)
+        val englishEmbedding = embeddingService.generateEmbedding(englishText)
+
+        // then
+        val similarity = cosineSimilarity(
+            koreanEmbedding.toArray().map { it.toFloat() }.toFloatArray(),
+            englishEmbedding.toArray().map { it.toFloat() }.toFloatArray()
+        )
+
+        println("📊 [AC4] 다국어 유사도 테스트:")
+        println("  - 한국어: \"$koreanText\"")
+        println("  - 영어: \"$englishText\"")
+        println("  - 코사인 유사도: $similarity")
+        println("  - 참고: MPNet은 다국어 지원 모델")
+
+        // MPNet은 다국어 지원이 뛰어나므로 0.6 이상 기대
+        assertThat(similarity).describedAs("한국어-영어 번역 유사도가 낮습니다")
+            .isGreaterThanOrEqualTo(0.6)
+    }
+
+    /**
+     * 코사인 유사도 계산
+     */
+    private fun cosineSimilarity(a: FloatArray, b: FloatArray): Double {
+        require(a.size == b.size) { "벡터 차원이 일치해야 합니다" }
+
+        val dotProduct = a.zip(b).sumOf { (x, y) -> (x * y).toDouble() }
+        val normA = sqrt(a.sumOf { (it * it).toDouble() })
+        val normB = sqrt(b.sumOf { (it * it).toDouble() })
+
+        return if (normA == 0.0 || normB == 0.0) 0.0 else dotProduct / (normA * normB)
+    }
+}
