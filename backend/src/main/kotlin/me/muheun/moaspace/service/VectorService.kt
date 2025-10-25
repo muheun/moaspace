@@ -5,11 +5,13 @@ import org.springframework.stereotype.Service
 import kotlin.random.Random
 
 /**
- * 벡터 임베딩 생성 서비스
+ * 벡터 임베딩 생성 서비스 (Mock 구현)
  * 현재는 목업 벡터를 생성하지만, 추후 OpenAI API나 로컬 모델로 교체 가능
+ *
+ * 실제 임베딩을 사용하려면 OnnxEmbeddingService를 사용하세요.
  */
 @Service
-class VectorService {
+class VectorService : VectorEmbeddingService {
 
     companion object {
         const val VECTOR_DIMENSION = 384 // MiniLM-L12-v2 ONNX 모델의 벡터 차원
@@ -22,7 +24,7 @@ class VectorService {
      * @param text 벡터화할 텍스트
      * @return PGvector 객체
      */
-    fun generateEmbedding(text: String): PGvector {
+    override fun generateEmbedding(text: String): PGvector {
         // TODO: 실제 임베딩 모델로 교체 필요 (OpenAI API, sentence-transformers 등)
         // 현재는 텍스트 해시 기반 시드를 사용하여 일관된 목업 벡터 생성
         val seed = text.hashCode().toLong()

@@ -10,9 +10,9 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.core.io.Resource
 import java.io.IOException
 import jakarta.annotation.PreDestroy
-import mu.KotlinLogging
+import org.slf4j.LoggerFactory
 
-private val logger = KotlinLogging.logger {}
+private val logger = LoggerFactory.getLogger(EmbeddingConfig::class.java)
 
 /**
  * DJL 기반 ONNX 임베딩 모델 설정
@@ -53,7 +53,7 @@ class EmbeddingConfig {
      */
     @Bean
     fun onnxEmbeddingModel(): ZooModel<FloatArray, FloatArray> {
-        logger.info { "DJL ONNX 모델 로딩 시작: $modelPath" }
+        logger.info("DJL ONNX 모델 로딩 시작: {}", modelPath)
 
         try {
             val criteria = Criteria.builder()
@@ -66,13 +66,13 @@ class EmbeddingConfig {
             val model = criteria.loadModel()
             onnxModel = model
 
-            logger.info { "✓ ONNX 모델 로딩 완료 (차원: $vectorDimension)" }
+            logger.info("✓ ONNX 모델 로딩 완료 (차원: {})", vectorDimension)
 
             @Suppress("UNCHECKED_CAST")
             return model as ZooModel<FloatArray, FloatArray>
 
         } catch (e: Exception) {
-            logger.error(e) { "✗ ONNX 모델 로딩 실패: ${e.message}" }
+            logger.error("✗ ONNX 모델 로딩 실패: {}", e.message, e)
             throw RuntimeException("ONNX 모델 로딩 실패: $modelPath", e)
         }
     }
@@ -87,7 +87,7 @@ class EmbeddingConfig {
      */
     @Bean
     fun tokenizerPath(): String {
-        logger.info { "Tokenizer 경로 설정: $tokenizerPath" }
+        logger.info("Tokenizer 경로 설정: {}", tokenizerPath)
         return tokenizerPath
     }
 
@@ -121,9 +121,9 @@ class EmbeddingConfig {
     fun cleanup() {
         try {
             onnxModel?.close()
-            logger.info { "✓ ONNX 모델 리소스 정리 완료" }
+            logger.info("✓ ONNX 모델 리소스 정리 완료")
         } catch (e: Exception) {
-            logger.warn(e) { "모델 리소스 정리 중 오류 발생 (무시됨)" }
+            logger.warn("모델 리소스 정리 중 오류 발생 (무시됨)", e)
         }
     }
 }
