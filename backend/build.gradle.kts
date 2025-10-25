@@ -38,8 +38,19 @@ dependencies {
     // Markdown 처리
     implementation("com.vladsch.flexmark:flexmark-all:0.64.8")
 
-    // OpenAI 토크나이저 (청킹용)
+    // OpenAI 토크나이저 (청킹용 - 기존 유지)
     implementation("com.knuddels:jtokkit:1.0.0")
+
+    // 형태소 분석기 - Open Korean Text (한국어 텍스트 정규화 및 토큰화)
+    implementation("org.openkoreantext:open-korean-text:2.3.1")
+
+    // DJL (Deep Java Library) - ONNX 기반 임베딩 (High-level API)
+    implementation("ai.djl:api:0.34.0")
+    implementation("ai.djl.onnxruntime:onnxruntime-engine:0.34.0")
+    implementation("ai.djl.huggingface:tokenizers:0.34.0")
+
+    // ONNX Runtime native 라이브러리
+    implementation("com.microsoft.onnxruntime:onnxruntime:1.16.3")
 
     // 개발 도구
     developmentOnly("org.springframework.boot:spring-boot-devtools")

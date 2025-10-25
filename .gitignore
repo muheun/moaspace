@@ -1,0 +1,60 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Kotlin/Java
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.iml
+*.log
+
+# IntelliJ IDEA
+.idea/
+out/
+*.iws
+*.ipr
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Environment
+.env*
+!.env.example
+
+# Models (from plan.md - 모델 파일 Git 제외 필수)
+models/**/*.onnx
+models/**/*.json
+models/**/*.bin
+models/**/*.pt
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+
+# Test coverage
+*.exec
+.jacoco/
+
+# Spring Boot
+spring-*.log
+
+# Spec-Kit
+.specify/temp/
+specs/.temp/
