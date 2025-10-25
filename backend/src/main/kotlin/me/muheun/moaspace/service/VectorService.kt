@@ -12,7 +12,7 @@ import kotlin.random.Random
 class VectorService {
 
     companion object {
-        const val VECTOR_DIMENSION = 1536 // OpenAI text-embedding-3-small과 호환되는 차원
+        const val VECTOR_DIMENSION = 384 // MiniLM-L12-v2 ONNX 모델의 벡터 차원
     }
 
     /**
