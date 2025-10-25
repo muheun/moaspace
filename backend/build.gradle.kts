@@ -38,6 +38,9 @@ dependencies {
     // Markdown 처리
     implementation("com.vladsch.flexmark:flexmark-all:0.64.8")
 
+    // OpenAI 토크나이저 (청킹용)
+    implementation("com.knuddels:jtokkit:1.0.0")
+
     // 개발 도구
     developmentOnly("org.springframework.boot:spring-boot-devtools")
 
