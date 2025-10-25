@@ -1,6 +1,6 @@
 spring:
   application:
-    name: vector-board-backend
+    name: moaspace
 
   datasource:
     url: ${DB_JDBC_URL}
@@ -28,6 +28,6 @@ server:
 
 logging:
   level:
-    com.example.vectorboard: DEBUG
+    me.muheun.moaspace: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
