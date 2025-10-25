@@ -1,66 +1,36 @@
 package me.muheun.moaspace.service
 
-import com.knuddels.jtokkit.Encodings
-import com.knuddels.jtokkit.api.Encoding
-import com.knuddels.jtokkit.api.EncodingRegistry
-import com.knuddels.jtokkit.api.ModelType
 import org.springframework.stereotype.Service
 
 /**
- * OpenAI 토크나이저 서비스
+ * 문자 기반 토크나이저 서비스
  *
- * jtokkit 라이브러리를 사용하여 텍스트를 토큰으로 변환하고 토큰 수를 계산합니다.
- * 이를 통해 OpenAI API의 토큰 제한에 맞춰 정확한 청크 크기를 계산할 수 있습니다.
+ * 문자 길이를 기반으로 토큰 수를 추정합니다.
+ * 실제 토큰 카운트가 아닌 추정치이므로 청킹 용도로만 사용합니다.
  *
  * 주요 기능:
- * - 텍스트 -> 토큰 ID 리스트 변환
- * - 토큰 수 계산
- * - 토큰 ID 리스트 -> 텍스트 복원
+ * - 텍스트 길이 기반 토큰 수 추정
+ * - 최대 토큰 수에 맞춰 텍스트 자르기
  *
- * @see <a href="https://github.com/knuddelsgmbh/jtokkit">jtokkit GitHub</a>
+ * 레퍼런스: vector_server_exam의 FixedSizeChunkingService
  */
 @Service
 class TokenizerService {
 
-    private val registry: EncodingRegistry = Encodings.newDefaultEncodingRegistry()
-
-    /**
-     * OpenAI text-embedding-3-small 모델용 인코딩
-     * cl100k_base 인코딩 사용 (GPT-4, GPT-3.5-turbo, text-embedding-3 공통)
-     */
-    private val encoding: Encoding = registry.getEncodingForModel(ModelType.TEXT_EMBEDDING_3_SMALL)
-
-    /**
-     * 텍스트를 토큰 ID 리스트로 변환
-     *
-     * @param text 변환할 텍스트
-     * @return 토큰 ID 리스트
-     */
-    fun encode(text: String): List<Int> {
-        val tokenIds = encoding.encode(text)
-        return (0 until tokenIds.size()).map { tokenIds[it] }
+    companion object {
+        // 평균적으로 한 토큰은 약 3.5자 (한국어/영어 혼합 기준)
+        private const val CHARS_PER_TOKEN = 3.5
     }
 
     /**
-     * 토큰 ID 리스트를 텍스트로 복원
-     *
-     * @param tokens 토큰 ID 리스트
-     * @return 복원된 텍스트
-     */
-    fun decode(tokens: List<Int>): String {
-        val tokenIds = com.knuddels.jtokkit.api.IntArrayList()
-        tokens.forEach { tokenIds.add(it) }
-        return encoding.decode(tokenIds)
-    }
-
-    /**
-     * 텍스트의 토큰 수 계산
+     * 텍스트의 토큰 수 추정
      *
      * @param text 토큰 수를 계산할 텍스트
-     * @return 토큰 수
+     * @return 추정 토큰 수
      */
     fun countTokens(text: String): Int {
-        return encoding.countTokens(text)
+        if (text.isEmpty()) return 0
+        return (text.length / CHARS_PER_TOKEN).toInt()
     }
 
     /**
@@ -73,12 +43,43 @@ class TokenizerService {
      * @return 잘라낸 텍스트
      */
     fun truncateToTokenLimit(text: String, maxTokens: Int): String {
-        val tokens = encode(text)
-        if (tokens.size <= maxTokens) {
+        val estimatedTokens = countTokens(text)
+        if (estimatedTokens <= maxTokens) {
             return text
         }
 
-        val truncatedTokens = tokens.take(maxTokens)
-        return decode(truncatedTokens)
+        // 최대 토큰에 해당하는 문자 수 계산
+        val maxChars = (maxTokens * CHARS_PER_TOKEN).toInt()
+
+        // 문자 경계에서 자르기 (문장 경계를 고려하지 않고 단순하게)
+        return if (text.length > maxChars) {
+            text.substring(0, maxChars)
+        } else {
+            text
+        }
+    }
+
+    /**
+     * 텍스트를 토큰 ID 리스트로 변환 (호환성 유지용)
+     *
+     * 실제 토큰화가 아닌 문자 인덱스 리스트 반환
+     *
+     * @param text 변환할 텍스트
+     * @return 문자 인덱스 리스트
+     */
+    fun encode(text: String): List<Int> {
+        return text.indices.toList()
+    }
+
+    /**
+     * 토큰 ID 리스트를 텍스트로 복원 (호환성 유지용)
+     *
+     * @param tokens 토큰 ID 리스트 (실제로는 인덱스)
+     * @return 복원된 텍스트
+     */
+    fun decode(tokens: List<Int>): String {
+        // 실제 토큰화가 아니므로 의미 없는 구현
+        // 기존 코드 호환성을 위해 유지
+        return ""
     }
 }

@@ -36,3 +36,9 @@ bin/
 # Logs
 logs/
 *.log
+
+# Models
+models/**/*.onnx
+models/**/*.bin
+models/**/*.pt
+!models/**/*.json

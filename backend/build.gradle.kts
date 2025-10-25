@@ -38,8 +38,8 @@ dependencies {
     // Markdown 처리
     implementation("com.vladsch.flexmark:flexmark-all:0.64.8")
 
-    // OpenAI 토크나이저 (청킹용 - 기존 유지)
-    implementation("com.knuddels:jtokkit:1.0.0")
+    // OpenAI 토크나이저 제거 - 문자 기반 청킹으로 변경 (레퍼런스 프로젝트 참조)
+    // implementation("com.knuddels:jtokkit:1.0.0")
 
     // 형태소 분석기 - Open Korean Text (한국어 텍스트 정규화 및 토큰화)
     implementation("org.openkoreantext:open-korean-text:2.3.1")
