@@ -41,4 +41,4 @@ logs/
 models/**/*.onnx
 models/**/*.bin
 models/**/*.pt
-!models/**/*.json
+models/**/*.json

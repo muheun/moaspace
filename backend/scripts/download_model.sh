@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# MiniLM-L12-v2 ONNX 모델 다운로드 스크립트
+# MPNet-base-v2 ONNX 모델 다운로드 스크립트
 # HuggingFace Hub에서 모델 파일과 토크나이저를 다운로드합니다.
 
 set -e  # 오류 발생 시 즉시 종료
@@ -16,11 +16,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$(dirname "$SCRIPT_DIR")"
 
 # 설정
-MODEL_DIR="$BACKEND_DIR/models/models_minilm"
-BASE_URL="https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2/resolve/main"
+MODEL_DIR="$BACKEND_DIR/models/models_mpnet"
+BASE_URL="https://huggingface.co/sentence-transformers/paraphrase-multilingual-mpnet-base-v2/resolve/main"
 MAX_RETRIES=3
 RETRY_DELAY=2
-MIN_FILE_SIZE=100000000  # 100MB (바이트 단위)
+MIN_FILE_SIZE=400000000  # 400MB (바이트 단위, MPNet은 더 큼)
 
 # 다운로드할 파일 목록
 FILES=(
@@ -31,7 +31,7 @@ FILES=(
 )
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}MiniLM-L12-v2 모델 다운로드 시작${NC}"
+echo -e "${GREEN}MPNet-base-v2 모델 다운로드 시작${NC}"
 echo -e "${GREEN}========================================${NC}"
 
 # 모델 디렉토리 생성
