@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional
 class VectorProcessingService(
     private val vectorChunkRepository: VectorChunkRepository,
     private val vectorService: VectorService,
-    private val chunkingService: ChunkingService
+    private val fixedSizeChunkingService: FixedSizeChunkingService
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -85,9 +85,9 @@ class VectorProcessingService(
         try {
             logger.debug("🟡 [필드 벡터화] 시작: $entity.$fieldName (recordKey=$recordKey, 텍스트 길이=${fieldValue.length})")
 
-            // 1. 텍스트 청킹
-            val chunks = chunkingService.chunkDocument(fieldValue)
-            logger.debug("🟢 [청킹 완료] $entity.$fieldName: ${chunks.size}개 청크 생성")
+            // 1. 텍스트 청킹 (토큰 기반 문장 경계 청킹)
+            val chunks = fixedSizeChunkingService.chunk(fieldValue)
+            logger.debug("🟢 [청킹 완료] $entity.$fieldName: ${chunks.size}개 청크 생성 (토큰 기반)")
 
             // 2. 병렬로 벡터 생성
             val vectorChunks = runBlocking {
@@ -102,9 +102,9 @@ class VectorProcessingService(
                             fieldName = fieldName,
                             chunkText = chunk.text,
                             chunkVector = vector,
-                            chunkIndex = chunk.index,
-                            startPosition = chunk.startPos,
-                            endPosition = chunk.endPos,
+                            chunkIndex = chunk.chunkIndex,
+                            startPosition = chunk.startPosition,
+                            endPosition = chunk.endPosition,
                             metadata = metadata
                         )
                     }
