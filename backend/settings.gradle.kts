@@ -1,1 +1,1 @@
-rootProject.name = "vector-board-backend"
+rootProject.name = "moaspace"
