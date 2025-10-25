@@ -2,25 +2,23 @@ package me.muheun.moaspace.service
 
 import ai.djl.huggingface.tokenizers.Encoding
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer
-import ai.djl.inference.Predictor
-import ai.djl.ndarray.NDArray
-import ai.djl.ndarray.NDManager
-import ai.djl.repository.zoo.ZooModel
-import ai.djl.translate.Batchifier
-import ai.djl.translate.TranslateException
-import ai.djl.translate.Translator
-import ai.djl.translate.TranslatorContext
+import ai.onnxruntime.OnnxTensor
+import ai.onnxruntime.OrtSession
 import com.pgvector.PGvector
+import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.context.annotation.Primary
 import org.springframework.stereotype.Service
-import java.nio.file.Paths
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import kotlin.math.sqrt
 
 private val logger = LoggerFactory.getLogger(OnnxEmbeddingService::class.java)
 
 /**
- * DJL 기반 ONNX 임베딩 서비스
+ * ONNX Runtime 기반 임베딩 서비스
  *
  * MiniLM-L12-v2 ONNX 모델을 사용하여 실제 의미 기반 벡터 임베딩을 생성합니다.
  *
@@ -30,26 +28,43 @@ private val logger = LoggerFactory.getLogger(OnnxEmbeddingService::class.java)
  * - Mean Pooling으로 문장 임베딩 생성
  * - L2 정규화로 코사인 유사도 최적화
  *
- * @property onnxModel DJL ONNX 모델 (EmbeddingConfig에서 주입)
+ * @property ortSession ONNX Runtime 세션
  * @property tokenizerPath HuggingFace Tokenizer 경로
  * @property maxTokenLength 최대 토큰 길이 (512)
  */
 @Service
+@Primary
 class OnnxEmbeddingService(
-    @Qualifier("onnxEmbeddingModel") private val onnxModel: ZooModel<FloatArray, FloatArray>,
+    private val ortEnvironment: ai.onnxruntime.OrtEnvironment,
+    private val ortSession: OrtSession,
     @Qualifier("tokenizerPath") private val tokenizerPath: String,
     @Qualifier("maxTokenLength") private val maxTokenLength: Int
 ) : VectorEmbeddingService {
 
-    private val tokenizer: HuggingFaceTokenizer by lazy {
+    private lateinit var tokenizer: HuggingFaceTokenizer
+    private val embeddingDimension = 384 // MiniLM-L12-v2
+
+    @PostConstruct
+    fun init() {
         try {
-            logger.info("HuggingFace Tokenizer 로딩 시작: $tokenizerPath")
-            val tokenizer = HuggingFaceTokenizer.newInstance(Paths.get(tokenizerPath))
-            logger.info("✓ Tokenizer 로딩 완료")
-            tokenizer
+            // Tokenizer 초기화
+            val tempTokenizerPath = Files.createTempFile("tokenizer", ".json")
+            tempTokenizerPath.toFile().deleteOnExit()
+
+            val tokenizerFile = Path.of(tokenizerPath)
+            if (!Files.exists(tokenizerFile)) {
+                throw RuntimeException("Tokenizer 파일을 찾을 수 없습니다: $tokenizerPath")
+            }
+
+            Files.copy(tokenizerFile, tempTokenizerPath, StandardCopyOption.REPLACE_EXISTING)
+            tokenizer = HuggingFaceTokenizer.newInstance(tempTokenizerPath)
+
+            logger.info("✓ HuggingFace Tokenizer 로딩 완료")
+            logger.info("✓ ONNX 임베딩 서비스 초기화 완료")
+
         } catch (e: Exception) {
-            logger.error("✗ Tokenizer 로딩 실패: ${e.message}", e)
-            throw RuntimeException("Tokenizer 로딩 실패: $tokenizerPath", e)
+            logger.error("✗ ONNX 임베딩 서비스 초기화 실패: ${e.message}", e)
+            throw RuntimeException("ONNX 임베딩 서비스 초기화 실패", e)
         }
     }
 
@@ -59,7 +74,7 @@ class OnnxEmbeddingService(
      * 전체 파이프라인:
      * 1. 입력 검증
      * 2. HuggingFace Tokenizer로 토큰화
-     * 3. ONNX 모델 추론
+     * 3. ONNX Runtime 추론
      * 4. Mean Pooling
      * 5. L2 정규화
      *
@@ -74,22 +89,62 @@ class OnnxEmbeddingService(
 
         try {
             // 2. 토큰화
-            val tokenIds = tokenize(text)
+            val encoding: Encoding = tokenizer.encode(text)
+            var inputIds = encoding.ids
+            var attentionMask = encoding.attentionMask
 
-            // 3. ONNX 추론
-            val rawEmbedding = runInference(tokenIds)
+            // Truncate 처리
+            if (inputIds.size > maxTokenLength) {
+                logger.warn("토큰 길이 초과 (${inputIds.size} > $maxTokenLength), truncate 수행")
+                inputIds = inputIds.copyOf(maxTokenLength)
+                attentionMask = attentionMask.copyOf(maxTokenLength)
+            }
 
-            // 4. Mean Pooling (ONNX 출력은 이미 pooled된 상태일 수 있음, 모델에 따라 다름)
-            // MiniLM-L12-v2 ONNX 모델은 일반적으로 CLS token embedding을 반환
-            // 또는 모든 토큰의 평균을 계산해야 할 수 있음
-            // 여기서는 이미 pooled된 것으로 가정
+            // 배치 차원 추가 [1, seq_len]
+            val batchInputIds = arrayOf(inputIds)
+            val batchAttentionMask = arrayOf(attentionMask)
 
-            // 5. L2 정규화
-            val normalizedEmbedding = normalizeL2(rawEmbedding)
+            // token_type_ids (모두 0)
+            val tokenTypeIds = arrayOf(LongArray(inputIds.size))
 
-            logger.debug("임베딩 생성 완료: 텍스트 길이=${text.length}, 벡터 차원=${normalizedEmbedding.size}")
+            // 3. ONNX 텐서 생성
+            val inputIdsTensor = OnnxTensor.createTensor(ortEnvironment, batchInputIds)
+            val attentionMaskTensor = OnnxTensor.createTensor(ortEnvironment, batchAttentionMask)
+            val tokenTypeIdsTensor = OnnxTensor.createTensor(ortEnvironment, tokenTypeIds)
 
-            return PGvector(normalizedEmbedding)
+            // 4. ONNX 추론
+            val inputs = mapOf(
+                "input_ids" to inputIdsTensor,
+                "attention_mask" to attentionMaskTensor,
+                "token_type_ids" to tokenTypeIdsTensor
+            )
+
+            val result = ortSession.run(inputs)
+
+            try {
+                // 출력 추출 (last_hidden_state: [batch_size, seq_len, hidden_size])
+                val outputValue = result.get(0)
+                val outputTensor = outputValue as OnnxTensor
+                @Suppress("UNCHECKED_CAST")
+                val outputArray = outputTensor.value as Array<Array<FloatArray>>
+
+                // 5. Mean Pooling
+                val embedding = meanPooling(outputArray[0], attentionMask)
+
+                // 6. L2 정규화
+                normalizeL2(embedding)
+
+                logger.debug("임베딩 생성 완료: 텍스트 길이=${text.length}, 벡터 차원=${embedding.size}")
+
+                return PGvector(embedding)
+
+            } finally {
+                // 리소스 정리
+                result.close()
+                inputIdsTensor.close()
+                attentionMaskTensor.close()
+                tokenTypeIdsTensor.close()
+            }
 
         } catch (e: IllegalArgumentException) {
             throw e
@@ -100,82 +155,44 @@ class OnnxEmbeddingService(
     }
 
     /**
-     * HuggingFace Tokenizer를 사용한 토큰화
+     * Mean pooling - attention mask를 고려한 평균
      *
-     * - Special tokens ([CLS], [SEP]) 자동 추가
-     * - maxTokenLength 초과 시 자동 truncate
-     *
-     * @param text 토큰화할 텍스트
-     * @return LongArray 토큰 ID 배열
+     * @param tokenEmbeddings 토큰별 임베딩 [seq_len, hidden_size]
+     * @param attentionMask attention mask [seq_len]
+     * @return 평균 임베딩 [hidden_size]
      */
-    private fun tokenize(text: String): LongArray {
-        try {
-            // Truncate는 Tokenizer 설정에 따라 자동으로 처리됨
-            val encoding: Encoding = tokenizer.encode(text)
+    private fun meanPooling(tokenEmbeddings: Array<FloatArray>, attentionMask: LongArray): FloatArray {
+        val result = FloatArray(embeddingDimension)
+        var validTokens = 0
 
-            val tokenIds = encoding.ids
-
-            logger.debug("토큰화 완료: 토큰 수=${tokenIds.size}")
-
-            // 최대 길이 체크 (필요시 수동 truncate)
-            return if (tokenIds.size > maxTokenLength) {
-                logger.warn("토큰 길이 초과 (${tokenIds.size} > $maxTokenLength), truncate 수행")
-                tokenIds.copyOf(maxTokenLength)
-            } else {
-                tokenIds
+        val maxLength = minOf(tokenEmbeddings.size, attentionMask.size)
+        for (i in 0 until maxLength) {
+            if (attentionMask[i] == 1L) {
+                for (j in 0 until embeddingDimension) {
+                    result[j] += tokenEmbeddings[i][j]
+                }
+                validTokens++
             }
-
-        } catch (e: Exception) {
-            logger.error("토큰화 실패: ${e.message}", e)
-            throw RuntimeException("토큰화 실패", e)
         }
-    }
 
-    /**
-     * ONNX Runtime을 통한 모델 추론
-     *
-     * DJL Predictor를 사용하여 ONNX 모델에 토큰 ID를 입력하고
-     * 384차원 임베딩 벡터를 출력받습니다.
-     *
-     * @param tokenIds 토큰 ID 배열
-     * @return FloatArray 임베딩 벡터 (raw, 정규화되지 않음)
-     * @throws TranslateException ONNX 추론 오류
-     */
-    private fun runInference(tokenIds: LongArray): FloatArray {
-        try {
-            // Translator 생성
-            val translator = EmbeddingTranslator()
-
-            // Predictor 생성 및 추론
-            onnxModel.newPredictor(translator).use { predictor ->
-                // 토큰 ID를 FloatArray로 변환 (ONNX 입력 형식)
-                val input = tokenIds.map { it.toFloat() }.toFloatArray()
-
-                val output = predictor.predict(input)
-
-                logger.debug("ONNX 추론 완료: 출력 차원=${output.size}")
-
-                return output
+        if (validTokens > 0) {
+            for (j in 0 until embeddingDimension) {
+                result[j] = result[j] / validTokens
             }
-
-        } catch (e: Exception) {
-            logger.error("ONNX 추론 실패: ${e.message}", e)
-            throw RuntimeException("ONNX 추론 실패", e)
         }
+
+        return result
     }
 
     /**
      * L2 정규화
      *
      * 벡터의 L2 norm을 1.0으로 만들어 코사인 유사도 계산을 최적화합니다.
-     * norm = sqrt(sum(x^2))
-     * normalized = x / norm
      *
-     * @param vector 원본 벡터
-     * @return FloatArray 정규화된 벡터 (norm = 1.0)
+     * @param vector 원본 벡터 (in-place 수정됨)
      * @throws IllegalStateException norm이 0인 경우
      */
-    private fun normalizeL2(vector: FloatArray): FloatArray {
+    private fun normalizeL2(vector: FloatArray) {
         // L2 norm 계산
         val norm = sqrt(vector.sumOf { (it * it).toDouble() }.toFloat())
 
@@ -185,39 +202,11 @@ class OnnxEmbeddingService(
             throw IllegalStateException("벡터 norm이 0입니다 (zero vector)")
         }
 
-        // 정규화
-        val normalized = vector.map { it / norm }.toFloatArray()
-
-        // 검증: norm이 1.0에 가까운지 확인
-        val normalizedNorm = sqrt(normalized.sumOf { (it * it).toDouble() }.toFloat())
-        logger.debug("L2 정규화 완료: norm=$norm → $normalizedNorm")
-
-        return normalized
-    }
-
-    /**
-     * DJL Translator for ONNX Embedding Model
-     *
-     * 입력: FloatArray (토큰 ID)
-     * 출력: FloatArray (임베딩 벡터)
-     */
-    private class EmbeddingTranslator : Translator<FloatArray, FloatArray> {
-
-        override fun processInput(ctx: TranslatorContext, input: FloatArray): ai.djl.ndarray.NDList {
-            val manager = ctx.ndManager
-            // 입력을 NDArray로 변환 (batch_size=1, seq_length=input.size)
-            val ndarray = manager.create(input).reshape(1, input.size.toLong())
-            return ai.djl.ndarray.NDList(ndarray)
+        // 정규화 (in-place)
+        for (i in vector.indices) {
+            vector[i] /= norm
         }
 
-        override fun processOutput(ctx: TranslatorContext, list: ai.djl.ndarray.NDList): FloatArray {
-            // ONNX 모델 출력을 FloatArray로 변환
-            val output = list[0] // 첫 번째 출력 (임베딩 벡터)
-            return output.toFloatArray()
-        }
-
-        override fun getBatchifier(): Batchifier {
-            return Batchifier.STACK
-        }
+        logger.debug("L2 정규화 완료: norm=$norm → 1.0")
     }
 }

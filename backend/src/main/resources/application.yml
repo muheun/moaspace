@@ -36,7 +36,7 @@ logging:
 vector:
   embedding:
     provider: onnx  # 임베딩 제공자 (onnx, openai, mock 등)
-    model-path: models/models_minilm/model.onnx  # ONNX 모델 파일 경로 (상대 경로)
-    tokenizer-path: models/models_minilm/tokenizer.json  # HuggingFace Tokenizer 파일 경로
+    model-path: ${ONNX_MODEL_PATH}  # ONNX 모델 파일 경로 (환경변수)
+    tokenizer-path: ${ONNX_TOKENIZER_PATH}  # HuggingFace Tokenizer 파일 경로 (환경변수)
     dimension: 384  # MiniLM-L12-v2 벡터 차원
     max-tokens: 512  # 최대 토큰 길이 (truncate)
