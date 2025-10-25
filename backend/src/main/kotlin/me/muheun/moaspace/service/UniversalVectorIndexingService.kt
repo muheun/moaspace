@@ -193,7 +193,11 @@ class UniversalVectorIndexingService(
                 startPosition = chunk.startPosition,
                 endPosition = chunk.endPosition,
                 similarityScore = weightedScore.totalScore, // 가중 평균 점수 사용
-                metadata = chunk.metadata
+                metadata = (chunk.metadata ?: emptyMap()) + mapOf(
+                    "namespace" to chunkResult.getNamespace(),
+                    "entity" to chunkResult.getEntity(),
+                    "field_name" to chunkResult.getFieldName()
+                )
             )
         }
     }
@@ -233,7 +237,11 @@ class UniversalVectorIndexingService(
                 startPosition = chunk.startPosition,
                 endPosition = chunk.endPosition,
                 similarityScore = result.getScore(),
-                metadata = chunk.metadata
+                metadata = (chunk.metadata ?: emptyMap()) + mapOf(
+                    "namespace" to result.getNamespace(),
+                    "entity" to result.getEntity(),
+                    "field_name" to result.getFieldName()
+                )
             )
         }
     }
