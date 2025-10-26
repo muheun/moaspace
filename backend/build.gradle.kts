@@ -1,11 +1,19 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
+buildscript {
+    dependencies {
+        classpath("org.postgresql:postgresql:42.7.4")
+        classpath("org.flywaydb:flyway-database-postgresql:11.15.0")
+    }
+}
+
 plugins {
     id("org.springframework.boot") version "3.2.1"
     id("io.spring.dependency-management") version "1.1.4"
     kotlin("jvm") version "1.9.21"
     kotlin("plugin.spring") version "1.9.21"
     kotlin("plugin.jpa") version "1.9.21"
+    id("org.flywaydb.flyway") version "11.15.0"
 }
 
 group = "me.muheun"
@@ -26,14 +34,23 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
 
+    // Spring Retry (비동기 재시도 메커니즘)
+    implementation("org.springframework.retry:spring-retry")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+
     // Kotlin
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
     // PostgreSQL & pgvector
-    runtimeOnly("org.postgresql:postgresql")
+    implementation("org.postgresql:postgresql")  // Flyway에서도 사용하도록 implementation으로 변경
     implementation("com.pgvector:pgvector:0.1.4")
+
+    // Flyway (데이터베이스 마이그레이션 도구)
+    // PostgreSQL 18 공식 지원 - 최신 안정 버전 (11.15.0)
+    implementation("org.flywaydb:flyway-core:11.15.0")
+    implementation("org.flywaydb:flyway-database-postgresql:11.15.0")
 
     // Markdown 처리
     implementation("com.vladsch.flexmark:flexmark-all:0.64.8")
@@ -85,4 +102,41 @@ tasks.withType<Test> {
         showStandardStreams = false
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
+}
+
+// .env 파일 파싱 함수
+fun loadEnvFile(envFile: File): Map<String, String> {
+    if (!envFile.exists()) {
+        throw GradleException(".env file not found at: ${envFile.absolutePath}")
+    }
+
+    return envFile.readLines()
+        .filter { line ->
+            line.isNotBlank() && !line.trim().startsWith("#")
+        }
+        .mapNotNull { line ->
+            val parts = line.split("=", limit = 2)
+            if (parts.size == 2) {
+                val key = parts[0].trim()
+                val value = parts[1].trim()
+                    .removePrefix("\"")
+                    .removeSuffix("\"")
+                key to value
+            } else {
+                null
+            }
+        }
+        .toMap()
+}
+
+// .env 파일에서 DB 설정 읽기
+val envFile = file(".env")
+val env = loadEnvFile(envFile)
+
+// Flyway 설정 (독립 실행을 위한 DB 연결 정보)
+flyway {
+    url = env["DB_JDBC_URL"] ?: throw GradleException("DB_JDBC_URL not found in .env")
+    user = env["DB_USER"] ?: throw GradleException("DB_USER not found in .env")
+    password = env["DB_PASSWORD"] ?: throw GradleException("DB_PASSWORD not found in .env")
+    locations = arrayOf("classpath:db/migration")
 }

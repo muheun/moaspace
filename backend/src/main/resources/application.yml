@@ -7,10 +7,27 @@ spring:
     username: ${DB_USER}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: HikariCP-Vector
+
+  # Flyway 데이터베이스 마이그레이션 설정
+  flyway:
+    enabled: true
+    baseline-on-migrate: true  # 기존 DB에 Flyway 적용 시 베이스라인 자동 생성
+    baseline-version: 1  # 베이스라인 버전 (V1__initial_schema.sql)
+    locations: classpath:db/migration  # 마이그레이션 스크립트 위치
+    validate-on-migrate: true  # 마이그레이션 전 검증 활성화
+    out-of-order: false  # 순서대로 마이그레이션 강제
+    placeholder-replacement: false  # 플레이스홀더 치환 비활성화
 
   jpa:
     hibernate:
-      ddl-auto: update  # 테스트용: 테이블 재생성
+      ddl-auto: validate  # Flyway가 스키마 관리, JPA는 검증만 수행
     show-sql: true
     properties:
       hibernate:
@@ -28,9 +45,18 @@ server:
 
 logging:
   level:
+    root: INFO
     me.muheun.moaspace: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    # 에러 처리 로깅
+    me.muheun.moaspace.config.GlobalExceptionHandler: ERROR
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/application.log
+    max-size: 10MB
+    max-history: 30
 
 # 벡터 임베딩 설정 (DJL 기반 ONNX 모델)
 vector:
@@ -40,3 +66,23 @@ vector:
     tokenizer-path: ${ONNX_TOKENIZER_PATH}  # HuggingFace Tokenizer 파일 경로 (환경변수)
     dimension: 768  # MPNet-base-v2 벡터 차원 (MiniLM에서 전환)
     max-tokens: 512  # 최대 토큰 길이 (truncate)
+
+  # 벡터 인덱싱 설정 (중앙화된 설정)
+  indexing:
+    # 청킹 설정
+    chunking:
+      max-tokens-per-chunk: 200  # 청크당 최대 토큰 수
+      target-tokens-per-chunk: 150  # 청크당 목표 토큰 수
+      overlap-tokens: 50  # 청크 간 오버랩 토큰 수
+
+    # 엔티티별 필드 가중치
+    field-weights:
+      posts:
+        weights:
+          title: 0.6  # 제목 가중치 60%
+          content: 0.4  # 본문 가중치 40%
+
+    # 기본 설정값
+    defaults:
+      namespace: vector_ai  # 기본 네임스페이스
+      search-limit: 10  # 검색 시 기본 limit
