@@ -61,8 +61,8 @@ class EndToEndIntegrationTest {
     @BeforeEach
     fun setUp() {
         // DB 초기화는 @Sql 어노테이션으로 처리됨
-        // 비동기 작업 완료 대기
-        Thread.sleep(500)
+        // 비동기 작업 완료 대기 (DB 초기화 완료 보장)
+        Thread.sleep(1000)
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -108,7 +108,7 @@ class EndToEndIntegrationTest {
         }
 
         // 비동기 벡터 생성 대기
-        Thread.sleep(2000)
+        Thread.sleep(5000)
 
         // when - "스마트폰" 검색 (products만 대상)
         val searchRequest = VectorSearchRequest(
@@ -152,7 +152,7 @@ class EndToEndIntegrationTest {
         )
         universalVectorIndexingService.indexEntity(productRequest)
 
-        Thread.sleep(2000) // 비동기 처리 대기
+        Thread.sleep(5000) // 비동기 처리 대기
 
         // when - Posts에서만 검색
         val postsSearch = VectorSearchRequest(
@@ -200,7 +200,7 @@ class EndToEndIntegrationTest {
         val response = restTemplate.postForEntity(baseUrl, request, PostResponse::class.java)
         val postId = response.body!!.id
 
-        Thread.sleep(1500) // 비동기 벡터 생성 대기
+        Thread.sleep(4000) // 비동기 벡터 생성 대기
 
         // when - Title 필드만 검색
         val titleSearch = VectorSearchRequest(
@@ -250,7 +250,7 @@ class EndToEndIntegrationTest {
             restTemplate.postForEntity(baseUrl, req, PostResponse::class.java)
         }
 
-        Thread.sleep(3000) // 비동기 처리 대기
+        Thread.sleep(6000) // 비동기 처리 대기
 
         // when - "Kotlin" 검색 (가중치: title 60%, content 40%)
         val searchRequest = VectorSearchRequest(
@@ -290,7 +290,7 @@ class EndToEndIntegrationTest {
         )
         restTemplate.postForEntity(baseUrl, request, PostResponse::class.java)
 
-        Thread.sleep(1500) // 비동기 처리 대기
+        Thread.sleep(4000) // 비동기 처리 대기
 
         // when
         val searchRequest = VectorSearchRequest(
@@ -332,7 +332,7 @@ class EndToEndIntegrationTest {
             )
         )
 
-        Thread.sleep(2000) // 비동기 처리 대기
+        Thread.sleep(5000) // 비동기 처리 대기
 
         // when - Posts만 검색
         val postsOnly = VectorSearchRequest(
@@ -375,7 +375,7 @@ class EndToEndIntegrationTest {
         val response = restTemplate.postForEntity(baseUrl, request, PostResponse::class.java)
         val postId = response.body!!.id.toString()
 
-        Thread.sleep(1500) // 비동기 처리 대기
+        Thread.sleep(4000) // 비동기 처리 대기
 
         // when - 생성된 청크 조회
         val chunks = vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc(
@@ -446,7 +446,7 @@ class EndToEndIntegrationTest {
         val createResponse = restTemplate.postForEntity(baseUrl, createRequest, PostResponse::class.java)
         val postId = createResponse.body!!.id
 
-        Thread.sleep(1500) // 비동기 처리 대기
+        Thread.sleep(4000) // 비동기 처리 대기
 
         val initialChunks = vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc(
             "vector_ai", "posts", postId.toString()
@@ -460,7 +460,7 @@ class EndToEndIntegrationTest {
         )
         restTemplate.put("$baseUrl/$postId", updateRequest)
 
-        Thread.sleep(2000) // 비동기 재처리 대기
+        Thread.sleep(5000) // 비동기 재처리 대기
 
         // then - 기존 청크는 삭제되고 새 청크만 존재
         val finalChunks = vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc(
@@ -511,7 +511,7 @@ class EndToEndIntegrationTest {
         )
         restTemplate.postForEntity(baseUrl, createRequest, PostResponse::class.java)
 
-        Thread.sleep(1500) // 비동기 처리 대기
+        Thread.sleep(4000) // 비동기 처리 대기
 
         // when
         val searchRequest = PostVectorSearchRequest(
@@ -613,7 +613,7 @@ class EndToEndIntegrationTest {
             universalVectorIndexingService.indexEntity(request)
         }
 
-        Thread.sleep(3000) // 비동기 처리 대기
+        Thread.sleep(6000) // 비동기 처리 대기
 
         // when - "Spring Boot" 검색 (Posts와 Comments 별도 검색)
         val postsSearch = VectorSearchRequest(

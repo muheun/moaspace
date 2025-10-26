@@ -1,4 +1,6 @@
 package me.muheun.moaspace.repository
+import com.pgvector.PGvector
+
 
 import me.muheun.moaspace.domain.ContentChunk
 import me.muheun.moaspace.domain.Post
@@ -37,7 +39,7 @@ interface ContentChunkRepository : JpaRepository<ContentChunk, Long> {
         value = """
             SELECT
                 c.post_id as postId,
-                MAX(1 - (c.chunk_vector <=> CAST(:queryVector AS vector))) as score
+                MAX(1 - (c.chunk_vector <=> :queryVector::vector)) as score
             FROM content_chunks c
             WHERE c.chunk_vector IS NOT NULL
             GROUP BY c.post_id
@@ -66,8 +68,8 @@ interface ContentChunkRepository : JpaRepository<ContentChunk, Long> {
                 SELECT
                     c.id,
                     c.post_id,
-                    1 - (c.chunk_vector <=> CAST(:queryVector AS vector)) as score,
-                    ROW_NUMBER() OVER (PARTITION BY c.post_id ORDER BY (1 - (c.chunk_vector <=> CAST(:queryVector AS vector))) DESC) as rank
+                    1 - (c.chunk_vector <=> :queryVector::vector) as score,
+                    ROW_NUMBER() OVER (PARTITION BY c.post_id ORDER BY (1 - (c.chunk_vector <=> :queryVector::vector)) DESC) as rank
                 FROM content_chunks c
                 WHERE c.chunk_vector IS NOT NULL
             )

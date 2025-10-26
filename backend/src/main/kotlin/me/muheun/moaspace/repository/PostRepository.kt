@@ -1,4 +1,6 @@
 package me.muheun.moaspace.repository
+import com.pgvector.PGvector
+
 
 import me.muheun.moaspace.domain.Post
 import org.springframework.data.jpa.repository.JpaRepository
@@ -21,10 +23,10 @@ interface PostRepository : JpaRepository<Post, Long> {
     @Query(
         value = """
             SELECT p.*,
-                   p.content_vector <=> CAST(:queryVector AS vector) AS similarity_score
+                   p.content_vector <=> :queryVector::vector AS similarity_score
             FROM posts p
             WHERE p.content_vector IS NOT NULL
-            ORDER BY p.content_vector <=> CAST(:queryVector AS vector)
+            ORDER BY p.content_vector <=> :queryVector::vector
             LIMIT :limit
         """,
         nativeQuery = true

@@ -30,7 +30,7 @@ class ContentChunk(
     @Column(name = "chunk_text", nullable = false, columnDefinition = "TEXT")
     val chunkText: String,
 
-    @Column(name = "chunk_vector", columnDefinition = "vector(1536)")
+    @Column(name = "chunk_vector", columnDefinition = "vector(768)")
     @Type(PGvectorType::class)
     var chunkVector: PGvector? = null,
 

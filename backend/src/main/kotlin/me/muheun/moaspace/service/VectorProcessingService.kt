@@ -14,29 +14,26 @@ import org.springframework.transaction.annotation.Transactional
 /**
  * 범용 벡터 처리 서비스
  *
- * 모든 엔티티(Post, Product, Comment 등)의 벡터 생성 및 청크 저장을 백그라운드에서 처리합니다.
- * VectorIndexingRequestedEvent를 수신하여 비동기로 VectorChunk를 생성합니다.
+ * VectorIndexingRequestedEvent를 수신하여 백그라운드에서 벡터 생성 및 청크 저장을 처리합니다.
  */
 @Service
 class VectorProcessingService(
     private val vectorChunkRepository: VectorChunkRepository,
-    private val vectorService: VectorService,
-    private val fixedSizeChunkingService: FixedSizeChunkingService
+    private val vectorService: VectorEmbeddingService,
+    private val tokenizerService: TokenizerService
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
+    companion object {
+        private const val MAX_TOKENS_PER_CHUNK = 512
+        private const val TARGET_TOKENS_PER_CHUNK = 256
+    }
+
     /**
      * 벡터 인덱싱 요청 이벤트 리스너
      *
-     * VectorIndexingRequestedEvent를 수신하여 백그라운드에서 벡터 생성 및 저장을 처리합니다.
-     *
-     * 처리 과정:
-     * 1. 각 필드별로 텍스트 청킹
-     * 2. 병렬로 벡터 생성
-     * 3. VectorChunk 엔티티로 저장
-     *
-     * @param event 벡터 인덱싱 요청 이벤트
+     * 각 필드별로 텍스트를 청킹하고 병렬로 벡터를 생성한 후 DB에 저장합니다.
      */
     @EventListener
     @Async
@@ -45,7 +42,6 @@ class VectorProcessingService(
         try {
             logger.info("🔵 [범용 인덱싱] 이벤트 수신: namespace=${event.namespace}, entity=${event.entity}, recordKey=${event.recordKey}, fields=${event.fields.keys}")
 
-            // 각 필드별로 처리
             event.fields.forEach { (fieldName, fieldValue) ->
                 processFieldVectorization(
                     namespace = event.namespace,
@@ -67,14 +63,9 @@ class VectorProcessingService(
     /**
      * 개별 필드의 벡터화 처리
      *
-     * @param namespace 네임스페이스
-     * @param entity 엔티티 타입
-     * @param recordKey 레코드 식별자
-     * @param fieldName 필드명
-     * @param fieldValue 필드 값 (텍스트)
-     * @param metadata 추가 메타데이터
+     * 테스트에서 직접 호출할 수 있도록 internal로 공개됩니다.
      */
-    private fun processFieldVectorization(
+    internal fun processFieldVectorization(
         namespace: String,
         entity: String,
         recordKey: String,
@@ -85,33 +76,30 @@ class VectorProcessingService(
         try {
             logger.debug("🟡 [필드 벡터화] 시작: $entity.$fieldName (recordKey=$recordKey, 텍스트 길이=${fieldValue.length})")
 
-            // 1. 텍스트 청킹 (토큰 기반 문장 경계 청킹)
-            val chunks = fixedSizeChunkingService.chunk(fieldValue)
-            logger.debug("🟢 [청킹 완료] $entity.$fieldName: ${chunks.size}개 청크 생성 (토큰 기반)")
+            val chunks = chunkText(fieldValue)
+            logger.debug("🟢 [청킹 완료] $entity.$fieldName: ${chunks.size}개 청크 생성")
 
-            // 2. 병렬로 벡터 생성
             val vectorChunks = runBlocking {
-                chunks.map { chunk ->
+                chunks.mapIndexed { index, chunkText ->
                     async(Dispatchers.IO) {
-                        val vector = vectorService.generateEmbedding(chunk.text)
+                        val vector = vectorService.generateEmbedding(chunkText)
 
                         VectorChunk(
                             namespace = namespace,
                             entity = entity,
                             recordKey = recordKey,
                             fieldName = fieldName,
-                            chunkText = chunk.text,
+                            chunkText = chunkText,
                             chunkVector = vector,
-                            chunkIndex = chunk.chunkIndex,
-                            startPosition = chunk.startPosition,
-                            endPosition = chunk.endPosition,
+                            chunkIndex = index,
+                            startPosition = 0,
+                            endPosition = chunkText.length,
                             metadata = metadata
                         )
                     }
                 }.awaitAll()
             }
 
-            // 3. Batch Insert
             vectorChunkRepository.saveAll(vectorChunks)
 
             logger.debug("✅ [필드 벡터화] 완료: $entity.$fieldName (${chunks.size}개 청크 DB 저장)")
@@ -120,5 +108,79 @@ class VectorProcessingService(
             logger.error("❌ [필드 벡터화] 실패: $entity.$fieldName (recordKey=$recordKey), error=${e.message}", e)
             throw e
         }
+    }
+
+    /**
+     * 텍스트를 토큰 기반으로 청킹
+     *
+     * 문장 단위로 분할하고 TARGET_TOKENS_PER_CHUNK를 기준으로 그룹화합니다.
+     */
+    private fun chunkText(text: String): List<String> {
+        if (text.isBlank()) return emptyList()
+
+        val totalTokens = tokenizerService.countTokens(text)
+
+        if (totalTokens <= TARGET_TOKENS_PER_CHUNK) {
+            return listOf(text.trim())
+        }
+
+        val sentences = splitIntoSentences(text)
+        val chunks = mutableListOf<String>()
+        val currentChunk = StringBuilder()
+        var currentTokenCount = 0
+
+        for (sentence in sentences) {
+            val sentenceTokens = tokenizerService.countTokens(sentence)
+
+            if (sentenceTokens > MAX_TOKENS_PER_CHUNK) {
+                if (currentChunk.isNotEmpty()) {
+                    chunks.add(currentChunk.toString().trim())
+                    currentChunk.clear()
+                    currentTokenCount = 0
+                }
+
+                val truncated = tokenizerService.truncateToTokenLimit(sentence, MAX_TOKENS_PER_CHUNK)
+                chunks.add(truncated)
+                continue
+            }
+
+            if (currentTokenCount + sentenceTokens > TARGET_TOKENS_PER_CHUNK && currentChunk.isNotEmpty()) {
+                chunks.add(currentChunk.toString().trim())
+                currentChunk.clear()
+                currentTokenCount = 0
+            }
+
+            currentChunk.append(sentence).append(" ")
+            currentTokenCount += sentenceTokens
+        }
+
+        if (currentChunk.isNotEmpty()) {
+            chunks.add(currentChunk.toString().trim())
+        }
+
+        return chunks
+    }
+
+    /**
+     * 텍스트를 문장 단위로 분할
+     */
+    private fun splitIntoSentences(text: String): List<String> {
+        val sentencePattern = Regex("""[^.!?]*[.!?]+""")
+        val matches = sentencePattern.findAll(text)
+        val sentences = matches.map { it.value.trim() }.filter { it.isNotBlank() }.toList()
+
+        if (sentences.isEmpty()) {
+            return listOf(text.trim())
+        }
+
+        val lastMatchEnd = matches.lastOrNull()?.range?.last ?: -1
+        if (lastMatchEnd < text.length - 1) {
+            val remaining = text.substring(lastMatchEnd + 1).trim()
+            if (remaining.isNotBlank()) {
+                return sentences + remaining
+            }
+        }
+
+        return sentences
     }
 }

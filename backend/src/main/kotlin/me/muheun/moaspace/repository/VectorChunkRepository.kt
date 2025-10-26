@@ -118,7 +118,7 @@ interface VectorChunkRepository : JpaRepository<VectorChunk, Long> {
         nativeQuery = true
     )
     fun findSimilarRecords(
-        @Param("queryVector") queryVector: String,
+        @Param("queryVector") queryVector: FloatArray,
         @Param("namespace") namespace: String?,
         @Param("entity") entity: String?,
         @Param("limit") limit: Int
@@ -172,7 +172,7 @@ interface VectorChunkRepository : JpaRepository<VectorChunk, Long> {
         nativeQuery = true
     )
     fun findTopChunksByRecord(
-        @Param("queryVector") queryVector: String,
+        @Param("queryVector") queryVector: FloatArray,
         @Param("namespace") namespace: String?,
         @Param("entity") entity: String?,
         @Param("fieldName") fieldName: String?,
@@ -224,7 +224,7 @@ interface VectorChunkRepository : JpaRepository<VectorChunk, Long> {
         nativeQuery = true
     )
     fun findByWeightedFieldScore(
-        @Param("queryVector") queryVector: String,
+        @Param("queryVector") queryVector: FloatArray,
         @Param("namespace") namespace: String,
         @Param("entity") entity: String,
         @Param("titleWeight") titleWeight: Double,

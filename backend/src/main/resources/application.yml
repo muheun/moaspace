@@ -10,7 +10,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: update  # 테스트용: 테이블 재생성
     show-sql: true
     properties:
       hibernate:

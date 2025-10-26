@@ -20,7 +20,7 @@ import java.time.LocalDateTime
  * @property recordKey 레코드 식별자 (원본 테이블의 ID를 문자열로 저장)
  * @property fieldName 필드명 (예: "title", "content", "description")
  * @property chunkText 청크의 실제 텍스트 내용
- * @property chunkVector 청크의 벡터 임베딩 (1536차원)
+ * @property chunkVector 청크의 벡터 임베딩 (768차원 - multilingual-e5-base)
  * @property chunkIndex 청크 순서 (0부터 시작)
  * @property startPosition 원본 텍스트에서의 시작 위치
  * @property endPosition 원본 텍스트에서의 끝 위치
@@ -68,7 +68,7 @@ class VectorChunk(
     @Column(name = "chunk_text", nullable = false, columnDefinition = "TEXT")
     val chunkText: String,
 
-    @Column(name = "chunk_vector", columnDefinition = "vector(1536)")
+    @Column(name = "chunk_vector", columnDefinition = "vector(768)")
     @Type(PGvectorType::class)
     var chunkVector: PGvector? = null,
 
