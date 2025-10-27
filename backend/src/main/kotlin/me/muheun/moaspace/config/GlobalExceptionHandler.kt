@@ -1,5 +1,6 @@
 package me.muheun.moaspace.config
 
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.validation.FieldError
@@ -13,6 +14,8 @@ import java.time.LocalDateTime
  */
 @RestControllerAdvice
 class GlobalExceptionHandler {
+
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     data class ErrorResponse(
         val timestamp: LocalDateTime = LocalDateTime.now(),
@@ -60,12 +63,13 @@ class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception::class)
     fun handleGeneralException(ex: Exception): ResponseEntity<ErrorResponse> {
-        ex.printStackTrace() // 개발 중에는 스택 트레이스 출력
+        // 로깅 시스템을 통한 안전한 에러 기록
+        logger.error("서버 내부 오류 발생: ${ex.javaClass.simpleName} - ${ex.message}", ex)
 
         val errorResponse = ErrorResponse(
             status = HttpStatus.INTERNAL_SERVER_ERROR.value(),
             error = "Internal Server Error",
-            message = "서버 내부 오류가 발생했습니다: ${ex.message}"
+            message = "서버 내부 오류가 발생했습니다"
         )
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse)
     }

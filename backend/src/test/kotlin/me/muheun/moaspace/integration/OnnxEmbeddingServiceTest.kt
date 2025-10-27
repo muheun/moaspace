@@ -58,7 +58,7 @@ class OnnxEmbeddingServiceTest {
 
     @Test
     @DisplayName("T022: 한국어 텍스트를 768차원 벡터로 임베딩하고 L2 norm이 1.0이어야 한다")
-    fun `should embed Korean text to 768-dimensional vector with L2 norm 1_0`() {
+    fun shouldEmbedKoreanTextTo768DimensionalVectorWithL2NormOne() {
         // given
         val text = "안녕하세요"
 
@@ -77,7 +77,7 @@ class OnnxEmbeddingServiceTest {
 
     @Test
     @DisplayName("T023: 동일한 텍스트를 두 번 임베딩하면 코사인 유사도가 1.0이어야 한다")
-    fun `should have cosine similarity 1_0 for identical text embeddings`() {
+    fun shouldHaveCosineSimilarityOneWhenEmbeddingIdenticalText() {
         // given
         val text = "Spring Boot는 Java 기반의 프레임워크입니다"
 
@@ -92,7 +92,7 @@ class OnnxEmbeddingServiceTest {
 
     @Test
     @DisplayName("T024: 의미적으로 유사한 한국어 텍스트는 높은 유사도를 가져야 한다 (≥ 0.8)")
-    fun `should have high similarity for semantically similar Korean texts`() {
+    fun shouldHaveHighSimilarityWhenEmbeddingSematicallySimilarKoreanTexts() {
         // given
         val text1 = "Python 프로그래밍"
         val text2 = "파이썬 코딩"
@@ -109,7 +109,7 @@ class OnnxEmbeddingServiceTest {
 
     @Test
     @DisplayName("T024: 의미적으로 다른 한국어 텍스트는 낮은 유사도를 가져야 한다 (< 0.85)")
-    fun `should have low similarity for semantically different Korean texts`() {
+    fun shouldHaveLowSimilarityWhenEmbeddingSemanticallyDifferentKoreanTexts() {
         // given - 문장 단위 테스트로 변경 (모델이 문장 임베딩에 최적화되어 있음)
         // 완전히 다른 주제: 기술 vs 자연/날씨
         // NOTE: multilingual-e5-base는 대칭적 문장 임베딩에 최적화되어 있어
@@ -129,7 +129,7 @@ class OnnxEmbeddingServiceTest {
 
     @Test
     @DisplayName("T025: 다국어 텍스트 (한국어-영어)는 높은 유사도를 가져야 한다 (≥ 0.7)")
-    fun `should have high similarity for multilingual texts (Korean-English)`() {
+    fun shouldHaveHighSimilarityWhenEmbeddingMultilingualTextsKoreanAndEnglish() {
         // given - Independent Test 기준
         val koreanText = "안녕하세요"
         val englishText = "Hello"
@@ -145,7 +145,7 @@ class OnnxEmbeddingServiceTest {
 
     @Test
     @DisplayName("T026: 512 토큰을 초과하는 긴 텍스트는 자동으로 truncate되어 정상 처리되어야 한다")
-    fun `should auto-truncate long text exceeding 512 tokens`() {
+    fun shouldAutoTruncateWhenTextExceeds512Tokens() {
         // given - 1000자 이상의 긴 텍스트
         val longText = "Spring Boot는 Java 기반의 프레임워크입니다. " .repeat(100)
 
@@ -163,7 +163,7 @@ class OnnxEmbeddingServiceTest {
 
     @Test
     @DisplayName("T027: 빈 문자열 입력 시 IllegalArgumentException이 발생해야 한다")
-    fun `should throw IllegalArgumentException for empty string`() {
+    fun shouldThrowIllegalArgumentExceptionWhenInputIsEmptyString() {
         // when & then
         assertThrows<IllegalArgumentException> {
             embeddingService.generateEmbedding("")
@@ -172,7 +172,7 @@ class OnnxEmbeddingServiceTest {
 
     @Test
     @DisplayName("T027: 공백만 있는 텍스트 입력 시 IllegalArgumentException이 발생해야 한다")
-    fun `should throw IllegalArgumentException for whitespace-only text`() {
+    fun shouldThrowIllegalArgumentExceptionWhenInputIsWhitespaceOnly() {
         // when & then
         assertThrows<IllegalArgumentException> {
             embeddingService.generateEmbedding("   ")
@@ -181,7 +181,7 @@ class OnnxEmbeddingServiceTest {
 
     @Test
     @DisplayName("T027: 특수문자만 있는 텍스트는 정상 처리되어야 한다")
-    fun `should handle text with only special characters`() {
+    fun shouldHandleTextWithOnlySpecialCharacters() {
         // given
         val specialText = "!@#$%^&*()"
 
@@ -196,7 +196,7 @@ class OnnxEmbeddingServiceTest {
 
     @Test
     @DisplayName("성능 테스트: 단일 문장(50자) 임베딩은 30ms 이내여야 한다")
-    fun `performance test - single sentence should complete within 30ms`() {
+    fun shouldCompleteWithin30msWhenEmbeddingSingleSentenceOf50Characters() {
         // given
         val text = "Spring Boot는 Java 기반의 강력한 웹 프레임워크입니다." // 약 50자
 

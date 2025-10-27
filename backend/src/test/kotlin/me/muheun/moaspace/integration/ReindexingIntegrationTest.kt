@@ -47,7 +47,7 @@ class ReindexingIntegrationTest {
 
     @Test
     @DisplayName("시나리오 1: 재인덱싱 시 기존 청크가 완전히 삭제되고 새 청크만 생성된다")
-    fun `should completely remove old chunks and create new ones on reindexing`() {
+    fun shouldCompletelyRemoveOldChunksAndCreateNewOnesWhenReindexing() {
         // given - 초기 인덱싱 (짧은 텍스트로 3개 청크 생성 예상)
         val recordKey = "product-001"
         val initialRequest = VectorIndexRequest(
@@ -115,7 +115,7 @@ class ReindexingIntegrationTest {
 
     @Test
     @DisplayName("시나리오 2: 레코드 삭제 시 해당 레코드의 모든 청크가 함께 삭제된다")
-    fun `should delete all chunks when record is deleted`() {
+    fun shouldDeleteAllChunksWhenRecordIsDeleted() {
         // given - 테스트 레코드 인덱싱
         val recordKey = "product-002"
         val request = VectorIndexRequest(
@@ -152,7 +152,7 @@ class ReindexingIntegrationTest {
 
     @Test
     @DisplayName("시나리오 3: 여러 레코드 재인덱싱 시에도 레코드 간 청크 혼재 없음")
-    fun `should not mix chunks between different records during reindexing`() {
+    fun shouldNotMixChunksBetweenDifferentRecordsWhenReindexing() {
         // given - 2개의 서로 다른 레코드 인덱싱
         val recordKey1 = "product-003"
         val recordKey2 = "product-004"

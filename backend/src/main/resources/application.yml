@@ -49,14 +49,8 @@ logging:
     me.muheun.moaspace: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
-    # 에러 처리 로깅
-    me.muheun.moaspace.config.GlobalExceptionHandler: ERROR
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-  file:
-    name: logs/application.log
-    max-size: 10MB
-    max-history: 30
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{requestId}] %-5level %logger{36} - %msg%n"
 
 # 벡터 임베딩 설정 (DJL 기반 ONNX 모델)
 vector:

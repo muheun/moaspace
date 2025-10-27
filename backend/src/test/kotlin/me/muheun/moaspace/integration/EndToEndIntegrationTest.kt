@@ -71,7 +71,7 @@ class EndToEndIntegrationTest {
 
     @Test
     @DisplayName("US1-1: Products 테이블을 벡터화하고 검색할 수 있다 (posts와 독립적)")
-    fun `should index and search products independently from posts`() {
+    fun shouldIndexAndSearchProductsIndependentlyWhenCreatedSeparately() {
         // given - Products 테이블 시뮬레이션 (UniversalVectorIndexingService 직접 사용)
         val products = listOf(
             VectorIndexRequest(
@@ -134,7 +134,7 @@ class EndToEndIntegrationTest {
 
     @Test
     @DisplayName("US1-2: Posts와 Products가 모두 인덱싱되어도 namespace/entity로 분리된다")
-    fun `should separate posts and products by namespace and entity`() {
+    fun shouldSeparatePostsAndProductsByNamespaceWhenBothIndexed() {
         // given - Posts 생성
         val postRequest = PostCreateRequest(
             title = "스마트폰 리뷰",
@@ -190,7 +190,7 @@ class EndToEndIntegrationTest {
 
     @Test
     @DisplayName("US2-1: Title과 Content를 독립적으로 검색할 수 있다")
-    fun `should search title and content fields independently`() {
+    fun shouldSearchTitleAndContentFieldsIndependentlyWhenQueried() {
         // given - "PostgreSQL" 제목 + "MySQL" 본문
         val request = PostCreateRequest(
             title = "PostgreSQL 완벽 가이드",
@@ -238,7 +238,7 @@ class EndToEndIntegrationTest {
 
     @Test
     @DisplayName("US2-2: 필드별 가중치 검색 - Title 60%, Content 40%")
-    fun `should apply field weights in search - 60 percent title 40 percent content`() {
+    fun shouldApplyFieldWeightsWhenSearchingWithWeightedQuery() {
         // given - 여러 게시글 생성
         val posts = listOf(
             PostCreateRequest("Kotlin 코루틴", "Java와 Kotlin의 차이점", "작성자1"),
@@ -281,7 +281,7 @@ class EndToEndIntegrationTest {
 
     @Test
     @DisplayName("US3-1: 검색 결과에 namespace, entity, field_name 메타데이터가 포함된다")
-    fun `should include namespace entity field metadata in search results`() {
+    fun shouldIncludeMetadataInResultsWhenSearchingVectors() {
         // given
         val request = PostCreateRequest(
             title = "테스트 게시글",
@@ -315,7 +315,7 @@ class EndToEndIntegrationTest {
 
     @Test
     @DisplayName("US3-2: Entity 필터링으로 검색 범위를 제한할 수 있다")
-    fun `should filter search results by entity`() {
+    fun shouldFilterSearchResultsByEntityWhenEntitySpecified() {
         // given - Posts와 Products 모두 생성
         restTemplate.postForEntity(
             baseUrl,
@@ -358,7 +358,7 @@ class EndToEndIntegrationTest {
 
     @Test
     @DisplayName("US4-1: 문장 경계가 보존되어 청킹된다")
-    fun `should preserve sentence boundaries during chunking`() {
+    fun shouldPreserveSentenceBoundariesWhenChunkingLongText() {
         // given - 여러 문장으로 구성된 긴 텍스트
         val longText = """
             첫 번째 문장입니다. 두 번째 문장입니다. 세 번째 문장입니다.
@@ -405,7 +405,7 @@ class EndToEndIntegrationTest {
 
     @Test
     @DisplayName("US4-2: 짧은 텍스트는 단일 청크로 처리된다")
-    fun `should handle short text as single chunk`() {
+    fun shouldHandleShortTextAsSingleChunkWhenTextIsSmall() {
         // given - 50자 이하 짧은 텍스트
         val shortText = "짧은 텍스트입니다."
 
@@ -436,7 +436,7 @@ class EndToEndIntegrationTest {
 
     @Test
     @DisplayName("US5-1: 재인덱싱 시 고아 청크가 발생하지 않는다")
-    fun `should not create orphan chunks during reindexing`() {
+    fun shouldNotCreateOrphanChunksWhenReindexingEntity() {
         // given - 초기 게시글 생성
         val createRequest = PostCreateRequest(
             title = "원본 제목",
@@ -482,7 +482,7 @@ class EndToEndIntegrationTest {
 
     @Test
     @DisplayName("US6-1: 기존 POST api/posts API가 정상 동작한다")
-    fun `should maintain compatibility with existing POST posts API`() {
+    fun shouldMaintainCompatibilityWhenUsingExistingPostApi() {
         // when
         val request = PostCreateRequest(
             title = "호환성 테스트",
@@ -502,7 +502,7 @@ class EndToEndIntegrationTest {
 
     @Test
     @DisplayName("US6-2: 기존 POST api/posts/search/vector API가 정상 동작한다")
-    fun `should maintain compatibility with existing vector search API`() {
+    fun shouldMaintainCompatibilityWhenUsingExistingVectorSearchApi() {
         // given
         val createRequest = PostCreateRequest(
             title = "검색 테스트",
@@ -534,7 +534,7 @@ class EndToEndIntegrationTest {
 
     @Test
     @DisplayName("US6-3: 전체 CRUD 작업이 새 시스템에서 정상 동작한다")
-    fun `should perform full CRUD operations with new system`() {
+    fun shouldPerformFullCrudOperationsWhenUsingNewSystem() {
         // Create
         val createRequest = PostCreateRequest("CRUD 제목", "CRUD 내용", "작성자")
         val createResponse = restTemplate.postForEntity(baseUrl, createRequest, PostResponse::class.java)
@@ -571,7 +571,7 @@ class EndToEndIntegrationTest {
 
     @Test
     @DisplayName("종합 시나리오: 블로그 시스템에서 게시글과 댓글을 벡터 검색한다")
-    fun `comprehensive scenario - blog system with posts and comments vector search`() {
+    fun shouldSearchPostsAndCommentsWhenRunningComprehensiveBlogScenario() {
         // given - 게시글 생성
         val post1 = PostCreateRequest(
             title = "Spring Boot 완벽 가이드",

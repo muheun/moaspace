@@ -42,7 +42,7 @@ class UniversalVectorIndexingServiceTest {
 
     @Test
     @DisplayName("indexEntity - 이벤트를 발행하고 즉시 CompletableFuture를 반환한다")
-    fun `should publish event and return immediate CompletableFuture when indexing entity`() {
+    fun shouldPublishEventAndReturnImmediateFutureWhenIndexingEntity() {
         // Given
         val request = VectorIndexRequest(
             namespace = "test_db",
@@ -77,7 +77,7 @@ class UniversalVectorIndexingServiceTest {
 
     @Test
     @DisplayName("reindexEntity - 기존 청크를 삭제하고 새 청크를 생성한다")
-    fun `should delete old chunks and create new chunks when reindexing`() {
+    fun shouldDeleteOldChunksAndCreateNewChunksWhenReindexing() {
         // Given: 먼저 청크 생성
         val initialRequest = VectorIndexRequest(
             namespace = "vector_ai",
@@ -124,7 +124,7 @@ class UniversalVectorIndexingServiceTest {
 
     @Test
     @DisplayName("deleteEntity - 지정된 엔티티의 모든 청크를 삭제한다")
-    fun `should delete all chunks of specified entity`() {
+    fun shouldDeleteAllChunksOfSpecifiedEntity() {
         // Given: 청크 생성
         val request = VectorIndexRequest(
             namespace = "vector_ai",
@@ -157,7 +157,7 @@ class UniversalVectorIndexingServiceTest {
 
     @Test
     @DisplayName("search - 검색어와 유사한 청크를 찾아 반환한다")
-    fun `should find and return similar chunks for query`() {
+    fun shouldFindAndReturnSimilarChunksForQuery() {
         // Given: 테스트 데이터 생성
         val product1 = VectorIndexRequest(
             namespace = "test_db",
@@ -197,7 +197,7 @@ class UniversalVectorIndexingServiceTest {
 
     @Test
     @DisplayName("indexEntity - 여러 필드를 가진 엔티티도 정상 인덱싱된다")
-    fun `should index entity with multiple fields successfully`() {
+    fun shouldIndexEntityWithMultipleFieldsSuccessfully() {
         // Given
         val request = VectorIndexRequest(
             namespace = "cms",
@@ -234,7 +234,7 @@ class UniversalVectorIndexingServiceTest {
 
     @Test
     @DisplayName("deleteEntity - 다양한 namespace와 entity 조합으로 삭제 가능하다")
-    fun `should delete entities from various namespace and entity combinations`() {
+    fun shouldDeleteEntitiesFromVariousNamespaceAndEntityCombinations() {
         // Given: 여러 엔티티 생성
         service.indexEntity(VectorIndexRequest("db1", "posts", "1", mapOf("text" to "내용1"), null))
         service.indexEntity(VectorIndexRequest("db2", "products", "2", mapOf("text" to "내용2"), null))
@@ -258,7 +258,7 @@ class UniversalVectorIndexingServiceTest {
 
     @Test
     @DisplayName("[US1] Scenario 1 - Product 테이블 10개 레코드, 스마트폰 검색 시 유사도 순 반환")
-    fun `US1_Scenario1 should return products sorted by similarity when searching for smartphone`() {
+    fun shouldReturnProductsSortedBySimilarityWhenSearchingForSmartphone() {
         // Given: 10개의 Product 레코드 생성
         val products = listOf(
             "갤럭시 스마트폰 최신 모델입니다",
@@ -315,7 +315,7 @@ class UniversalVectorIndexingServiceTest {
 
     @Test
     @DisplayName("[US1] Scenario 2 - posts와 products 모두 인덱싱, posts만 검색 시 products 제외")
-    fun `US1_Scenario2 should return only posts when searching in posts entity`() {
+    fun shouldReturnOnlyPostsWhenSearchingInPostsEntity() {
         // Given: posts와 products 모두 인덱싱
         // Posts 데이터
         service.indexEntity(
@@ -378,7 +378,7 @@ class UniversalVectorIndexingServiceTest {
 
     @Test
     @DisplayName("[US1] Scenario 3 - comments 테이블 추가 시 코드 변경 없이 즉시 인덱싱 및 검색")
-    fun `US1_Scenario3 should index and search comments without code changes`() {
+    fun shouldIndexAndSearchCommentsWithoutCodeChanges() {
         // Given: 새로운 comments 엔티티 추가 (코드 변경 없이)
         service.indexEntity(
             VectorIndexRequest(
@@ -440,7 +440,7 @@ class UniversalVectorIndexingServiceTest {
 
     @Test
     @DisplayName("US2-AC1 - 특정 필드만 검색하면 해당 필드가 매칭 필드로 표시됨")
-    fun `US2_AC1 should match specific field when searching only that field`() {
+    fun shouldMatchSpecificFieldWhenSearchingOnlyThatField() {
         // Given: "제목: PostgreSQL 가이드, 본문: MySQL 설명..." 게시글
         service.indexEntity(
             VectorIndexRequest(
@@ -489,7 +489,7 @@ class UniversalVectorIndexingServiceTest {
 
     @Test
     @DisplayName("US2-AC2 - 필드별 가중치 적용 시 가중치가 높은 필드 매칭이 더 높은 점수를 받음")
-    fun `US2_AC2 should apply field weights correctly when searching`() {
+    fun shouldApplyFieldWeightsCorrectlyWhenSearching() {
         // Given: title과 content가 모두 벡터화된 게시글
         service.indexEntity(
             VectorIndexRequest(
@@ -549,7 +549,7 @@ class UniversalVectorIndexingServiceTest {
 
     @Test
     @DisplayName("US2-AC3 - 특정 필드만 업데이트하면 해당 필드 벡터만 재생성됨")
-    fun `US2_AC3 should regenerate only updated field vectors`() {
+    fun shouldRegenerateOnlyUpdatedFieldVectors() {
         // Given: Product의 name과 description 필드가 모두 벡터화됨
         service.indexEntity(
             VectorIndexRequest(

@@ -5,6 +5,7 @@ import me.muheun.moaspace.dto.VectorSearchRequest
 import me.muheun.moaspace.dto.VectorSearchResult
 import me.muheun.moaspace.event.VectorIndexingRequestedEvent
 import me.muheun.moaspace.repository.VectorChunkRepository
+import me.muheun.moaspace.repository.VectorChunkSearchResult
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -127,26 +128,7 @@ class UniversalVectorIndexingService(
                 it.getRecordKey() == recordKey.recordKey
             } ?: return@mapNotNull null
 
-            val chunk = vectorChunkRepository.findById(chunkResult.getChunkId()).orElse(null)
-                ?: return@mapNotNull null
-
-            VectorSearchResult(
-                chunkId = chunkResult.getChunkId(),
-                namespace = chunkResult.getNamespace(),
-                entity = chunkResult.getEntity(),
-                recordKey = chunkResult.getRecordKey(),
-                fieldName = chunkResult.getFieldName(),
-                chunkText = chunk.chunkText,
-                chunkIndex = chunk.chunkIndex,
-                startPosition = chunk.startPosition,
-                endPosition = chunk.endPosition,
-                similarityScore = weightedScore.totalScore,
-                metadata = mapOf(
-                    "namespace" to chunk.namespace,
-                    "entity" to chunk.entity,
-                    "field_name" to chunk.fieldName
-                ) + (chunk.metadata ?: emptyMap())
-            )
+            mapChunkToSearchResult(chunkResult, weightedScore.totalScore)
         }
     }
 
@@ -166,27 +148,39 @@ class UniversalVectorIndexingService(
         )
 
         return chunkResults.mapNotNull { result ->
-            val chunk = vectorChunkRepository.findById(result.getChunkId()).orElse(null)
-                ?: return@mapNotNull null
-
-            VectorSearchResult(
-                chunkId = result.getChunkId(),
-                namespace = result.getNamespace(),
-                entity = result.getEntity(),
-                recordKey = result.getRecordKey(),
-                fieldName = result.getFieldName(),
-                chunkText = chunk.chunkText,
-                chunkIndex = chunk.chunkIndex,
-                startPosition = chunk.startPosition,
-                endPosition = chunk.endPosition,
-                similarityScore = result.getScore(),
-                metadata = mapOf(
-                    "namespace" to chunk.namespace,
-                    "entity" to chunk.entity,
-                    "field_name" to chunk.fieldName
-                ) + (chunk.metadata ?: emptyMap())
-            )
+            mapChunkToSearchResult(result, result.getScore())
         }
+    }
+
+    /**
+     * VectorChunkSearchResult를 VectorSearchResult로 변환
+     *
+     * 중복 코드 제거를 위한 공통 매핑 메서드입니다.
+     */
+    private fun mapChunkToSearchResult(
+        chunkResult: VectorChunkSearchResult,
+        similarityScore: Double
+    ): VectorSearchResult? {
+        val chunk = vectorChunkRepository.findById(chunkResult.getChunkId()).orElse(null)
+            ?: return null
+
+        return VectorSearchResult(
+            chunkId = chunkResult.getChunkId(),
+            namespace = chunkResult.getNamespace(),
+            entity = chunkResult.getEntity(),
+            recordKey = chunkResult.getRecordKey(),
+            fieldName = chunkResult.getFieldName(),
+            chunkText = chunk.chunkText,
+            chunkIndex = chunk.chunkIndex,
+            startPosition = chunk.startPosition,
+            endPosition = chunk.endPosition,
+            similarityScore = similarityScore,
+            metadata = mapOf(
+                "namespace" to chunk.namespace,
+                "entity" to chunk.entity,
+                "field_name" to chunk.fieldName
+            ) + (chunk.metadata ?: emptyMap())
+        )
     }
 }
 

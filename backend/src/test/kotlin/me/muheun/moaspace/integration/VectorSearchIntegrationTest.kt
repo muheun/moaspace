@@ -46,7 +46,7 @@ class VectorSearchIntegrationTest {
 
     @Test
     @DisplayName("게시글 생성 시 벡터가 자동으로 생성된다")
-    fun `should auto-generate vector on post creation`() {
+    fun shouldAutoGenerateVectorWhenPostCreated() {
         // given
         val request = PostCreateRequest(
             title = "Spring Boot 가이드",
@@ -72,7 +72,7 @@ class VectorSearchIntegrationTest {
 
     @Test
     @DisplayName("유사한 내용의 게시글을 벡터 검색으로 찾을 수 있다")
-    fun `should find similar posts using vector search`() {
+    fun shouldFindSimilarPostsWhenVectorSearchExecuted() {
         // given - 여러 주제의 게시글 생성
         val posts = listOf(
             PostCreateRequest("Spring Boot 튜토리얼", "Spring Boot 프레임워크 학습", "작성자1"),
@@ -104,7 +104,7 @@ class VectorSearchIntegrationTest {
 
     @Test
     @DisplayName("검색 결과가 없을 때 빈 배열을 반환한다")
-    fun `should return empty array when no posts exist`() {
+    fun shouldReturnEmptyArrayWhenNoPostsExist() {
         // given
         val searchRequest = PostVectorSearchRequest(query = "존재하지 않는 내용", limit = 5)
 
@@ -122,7 +122,7 @@ class VectorSearchIntegrationTest {
 
     @Test
     @DisplayName("limit 파라미터가 결과 수를 제한한다")
-    fun `should respect limit parameter`() {
+    fun shouldRespectLimitParameterWhenSearching() {
         // given - 5개의 게시글 생성
         (1..5).forEach { i ->
             val request = PostCreateRequest("제목 $i", "내용 $i", "작성자 $i")
@@ -147,7 +147,7 @@ class VectorSearchIntegrationTest {
 
     @Test
     @DisplayName("벡터가 있는 게시글만 검색 결과에 포함된다")
-    fun `should only include posts with vectors in search results`() {
+    fun shouldOnlyIncludePostsWithVectorsWhenSearching() {
         // given
         val request = PostCreateRequest("테스트 게시글", "테스트 내용", "작성자")
         restTemplate.postForEntity(baseUrl, request, PostResponse::class.java)
@@ -170,7 +170,7 @@ class VectorSearchIntegrationTest {
 
     @Test
     @DisplayName("다양한 주제의 게시글에서 의미 기반 검색이 작동한다")
-    fun `should perform semantic search across diverse topics`() {
+    fun shouldPerformSemanticSearchWhenDiverseTopicsExist() {
         // given
         val techPosts = listOf(
             PostCreateRequest("머신러닝 기초", "인공지능과 딥러닝 개념", "AI전문가"),
@@ -200,7 +200,7 @@ class VectorSearchIntegrationTest {
 
     @Test
     @DisplayName("게시글 수정 시 벡터가 재생성된다")
-    fun `should regenerate vector on post update`() {
+    fun shouldRegenerateVectorWhenPostUpdated() {
         // given
         val createRequest = PostCreateRequest("원본 제목", "원본 내용", "작성자")
         val createResponse = restTemplate.postForEntity(
@@ -230,7 +230,7 @@ class VectorSearchIntegrationTest {
 
     @Test
     @DisplayName("전체 CRUD 작업이 정상 동작한다")
-    fun `should perform full CRUD operations`() {
+    fun shouldPerformFullCrudOperationsSuccessfully() {
         // Create
         val createRequest = PostCreateRequest("CRUD 테스트", "생성 테스트", "작성자")
         val createResponse = restTemplate.postForEntity(baseUrl, createRequest, PostResponse::class.java)

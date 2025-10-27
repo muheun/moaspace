@@ -43,7 +43,7 @@ class PostRepositoryTest {
 
     @Test
     @DisplayName("게시글을 저장할 수 있다")
-    fun `should save post`() {
+    fun shouldSavePost() {
         // when
         val savedPost = postRepository.save(testPost)
         entityManager.flush()
@@ -56,7 +56,7 @@ class PostRepositoryTest {
 
     @Test
     @DisplayName("ID로 게시글을 조회할 수 있다")
-    fun `should find post by id`() {
+    fun shouldFindPostById() {
         // given
         val savedPost = entityManager.persist(testPost)
         entityManager.flush()
@@ -71,7 +71,7 @@ class PostRepositoryTest {
 
     @Test
     @DisplayName("모든 게시글을 조회할 수 있다")
-    fun `should find all posts`() {
+    fun shouldFindAllPosts() {
         // given
         val post1 = Post(title = "게시글 1", content = "내용 1", author = "작성자 1")
         val post2 = Post(title = "게시글 2", content = "내용 2", author = "작성자 2")
@@ -91,7 +91,7 @@ class PostRepositoryTest {
 
     @Test
     @DisplayName("게시글을 삭제할 수 있다")
-    fun `should delete post`() {
+    fun shouldDeletePost() {
         // given
         val savedPost = entityManager.persist(testPost)
         entityManager.flush()
@@ -108,7 +108,7 @@ class PostRepositoryTest {
 
     @Test
     @DisplayName("제목으로 게시글을 검색할 수 있다")
-    fun `should find posts by title containing`() {
+    fun shouldFindPostsByTitleContaining() {
         // given
         val post1 = Post(title = "Spring Boot 가이드", content = "내용 1", author = "작성자 1")
         val post2 = Post(title = "Kotlin 튜토리얼", content = "내용 2", author = "작성자 2")
@@ -130,7 +130,7 @@ class PostRepositoryTest {
 
     @Test
     @DisplayName("벡터가 null이 아닌 게시글만 조회할 수 있다")
-    fun `should find posts with non-null vectors`() {
+    fun shouldFindPostsWithNonNullVectors() {
         // given
         val postWithoutVector = Post(
             title = "벡터 없는 게시글",
@@ -151,7 +151,7 @@ class PostRepositoryTest {
 
     @Test
     @DisplayName("게시글을 수정할 수 있다")
-    fun `should update post`() {
+    fun shouldUpdatePost() {
         // given
         val savedPost = entityManager.persist(testPost)
         entityManager.flush()
@@ -174,7 +174,7 @@ class PostRepositoryTest {
 
     @Test
     @DisplayName("존재하지 않는 ID로 조회하면 빈 Optional을 반환한다")
-    fun `should return empty optional for non-existent id`() {
+    fun shouldReturnEmptyOptionalForNonExistentId() {
         // when
         val foundPost = postRepository.findById(999L)
 

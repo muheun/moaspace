@@ -1,5 +1,6 @@
 package me.muheun.moaspace.service
 
+import me.muheun.moaspace.config.VectorIndexingProperties
 import me.muheun.moaspace.domain.Post
 import me.muheun.moaspace.dto.PostVectorSearchRequest
 import me.muheun.moaspace.dto.PostVectorSearchResult
@@ -16,23 +17,34 @@ import java.util.concurrent.CompletableFuture
 /**
  * Post 엔티티와 범용 벡터 시스템 간의 어댑터
  *
- * Post의 title과 content를 독립적으로 벡터화하고, 검색 시 title 60%, content 40% 가중치를 적용합니다.
+ * Post의 title과 content를 독립적으로 벡터화하고, 설정된 가중치로 검색합니다.
+ * 가중치는 application.yml의 vector.indexing.field-weights.posts에서 설정 가능합니다.
  */
 @Service
 class PostVectorAdapter(
     private val universalVectorIndexingService: UniversalVectorIndexingService,
     private val markdownService: MarkdownService,
-    private val postRepository: PostRepository
+    private val postRepository: PostRepository,
+    private val vectorIndexingProperties: VectorIndexingProperties
 ) {
 
     companion object {
-        private const val NAMESPACE = "vector_ai"
         private const val ENTITY = "posts"
         private const val FIELD_TITLE = "title"
         private const val FIELD_CONTENT = "content"
-        private const val TITLE_WEIGHT = 0.6
-        private const val CONTENT_WEIGHT = 0.4
     }
+
+    /** 설정에서 네임스페이스 조회 */
+    private val namespace: String
+        get() = vectorIndexingProperties.defaults.namespace
+
+    /** 설정에서 title 가중치 조회 */
+    private val titleWeight: Double
+        get() = vectorIndexingProperties.fieldWeights[ENTITY]?.weights?.get(FIELD_TITLE) ?: 0.6
+
+    /** 설정에서 content 가중치 조회 */
+    private val contentWeight: Double
+        get() = vectorIndexingProperties.fieldWeights[ENTITY]?.weights?.get(FIELD_CONTENT) ?: 0.4
 
     /**
      * Post를 벡터 인덱스에 추가
@@ -41,7 +53,7 @@ class PostVectorAdapter(
         val plainContent = markdownService.toPlainText(post.content)
 
         val request = VectorIndexRequest(
-            namespace = NAMESPACE,
+            namespace = namespace,
             entity = ENTITY,
             recordKey = post.id.toString(),
             fields = mapOf(
@@ -65,7 +77,7 @@ class PostVectorAdapter(
         val plainContent = markdownService.toPlainText(post.content)
 
         val request = VectorIndexRequest(
-            namespace = NAMESPACE,
+            namespace = namespace,
             entity = ENTITY,
             recordKey = post.id.toString(),
             fields = mapOf(
@@ -88,7 +100,7 @@ class PostVectorAdapter(
     @Transactional
     fun deletePost(postId: Long) {
         universalVectorIndexingService.deleteEntity(
-            namespace = NAMESPACE,
+            namespace = namespace,
             entity = ENTITY,
             recordKey = postId.toString()
         )
@@ -97,18 +109,19 @@ class PostVectorAdapter(
     /**
      * 벡터 유사도 기반 Post 검색
      *
-     * title 60%, content 40% 가중치로 검색합니다.
+     * 설정된 가중치(title/content)로 검색합니다.
+     * 가중치는 application.yml의 vector.indexing.field-weights.posts에서 변경 가능합니다.
      */
     @Transactional(readOnly = true)
     fun searchPosts(request: PostVectorSearchRequest): List<PostVectorSearchResult> {
         val vectorSearchRequest = VectorSearchRequest(
             query = request.query,
-            namespace = NAMESPACE,
+            namespace = namespace,
             entity = ENTITY,
             fieldName = null,
             fieldWeights = mapOf(
-                FIELD_TITLE to TITLE_WEIGHT,
-                FIELD_CONTENT to CONTENT_WEIGHT
+                FIELD_TITLE to titleWeight,
+                FIELD_CONTENT to contentWeight
             ),
             limit = request.limit
         )
@@ -138,11 +151,11 @@ class PostVectorAdapter(
     fun searchByField(
         query: String,
         fieldName: String,
-        limit: Int = 10
+        limit: Int = vectorIndexingProperties.defaults.searchLimit
     ): List<PostVectorSearchResult> {
         val vectorSearchRequest = VectorSearchRequest(
             query = query,
-            namespace = NAMESPACE,
+            namespace = namespace,
             entity = ENTITY,
             fieldName = fieldName,
             fieldWeights = null,

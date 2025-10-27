@@ -29,7 +29,7 @@ class OnnxPrototypeTest {
 
     @Test
     @DisplayName("AC1: '안녕하세요'를 768차원 벡터로 임베딩하고 L2 norm이 1.0이어야 한다")
-    fun `should embed hello in Korean to 768-dimensional vector with L2 norm 1_0`() {
+    fun shouldEmbedKoreanTextTo768DimensionalVectorWithL2NormOne() {
         // given
         val text = "안녕하세요"
 
@@ -54,7 +54,7 @@ class OnnxPrototypeTest {
 
     @Test
     @DisplayName("AC2: 성능 테스트 - 단일 문장 임베딩이 50ms 이내여야 한다 (MPNet 기준)")
-    fun `performance test - single sentence should complete within 50ms`() {
+    fun shouldCompleteEmbeddingWithin50MsWhenProcessingSingleSentence() {
         // given
         val text = "Spring Boot는 Java 기반의 강력한 웹 프레임워크입니다."
 
@@ -90,7 +90,7 @@ class OnnxPrototypeTest {
 
     @Test
     @DisplayName("AC3: 의미적으로 유사한 텍스트는 높은 유사도를 가져야 한다")
-    fun `should have high similarity for semantically similar texts`() {
+    fun shouldHaveHighSimilarityWhenTextsSemanticallyRelated() {
         // given
         val text1 = "Python 프로그래밍"
         val text2 = "파이썬 코딩"
@@ -117,7 +117,7 @@ class OnnxPrototypeTest {
 
     @Test
     @DisplayName("AC4: 다국어 텍스트 (한국어-영어)의 유사도를 검증한다")
-    fun `should handle multilingual texts Korean and English`() {
+    fun shouldHandleMultilingualTextsWhenComparingKoreanAndEnglish() {
         // given
         val koreanText = "안녕하세요"
         val englishText = "Hello"

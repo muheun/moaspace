@@ -6,38 +6,36 @@ import me.muheun.moaspace.repository.VectorChunkRepository
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import org.springframework.context.event.EventListener
+import org.springframework.retry.annotation.Backoff
+import org.springframework.retry.annotation.Retryable
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.sql.SQLException
 
 /**
  * 범용 벡터 처리 서비스
  *
  * VectorIndexingRequestedEvent를 수신하여 백그라운드에서 벡터 생성 및 청크 저장을 처리합니다.
+ * Spring AOP 프록시를 위해 open 클래스로 선언합니다.
  */
 @Service
-class VectorProcessingService(
+open class VectorProcessingService(
     private val vectorChunkRepository: VectorChunkRepository,
     private val vectorService: VectorEmbeddingService,
-    private val tokenizerService: TokenizerService
+    private val chunkingService: ChunkingService
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
-
-    companion object {
-        private const val MAX_TOKENS_PER_CHUNK = 512
-        private const val TARGET_TOKENS_PER_CHUNK = 256
-    }
 
     /**
      * 벡터 인덱싱 요청 이벤트 리스너
      *
      * 각 필드별로 텍스트를 청킹하고 병렬로 벡터를 생성한 후 DB에 저장합니다.
+     * 트랜잭션은 processFieldVectorization 내부의 batch save에서만 적용됩니다.
      */
     @EventListener
     @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun handleVectorIndexingRequest(event: VectorIndexingRequestedEvent) {
         try {
             logger.info("🔵 [범용 인덱싱] 이벤트 수신: namespace=${event.namespace}, entity=${event.entity}, recordKey=${event.recordKey}, fields=${event.fields.keys}")
@@ -64,6 +62,7 @@ class VectorProcessingService(
      * 개별 필드의 벡터화 처리
      *
      * 테스트에서 직접 호출할 수 있도록 internal로 공개됩니다.
+     * 벡터 생성은 병렬로 수행하고, DB 저장만 트랜잭션으로 묶습니다.
      */
     internal fun processFieldVectorization(
         namespace: String,
@@ -76,7 +75,7 @@ class VectorProcessingService(
         try {
             logger.debug("🟡 [필드 벡터화] 시작: $entity.$fieldName (recordKey=$recordKey, 텍스트 길이=${fieldValue.length})")
 
-            val chunks = chunkText(fieldValue)
+            val chunks = chunkingService.chunkText(fieldValue)
             logger.debug("🟢 [청킹 완료] $entity.$fieldName: ${chunks.size}개 청크 생성")
 
             val vectorChunks = runBlocking {
@@ -100,7 +99,7 @@ class VectorProcessingService(
                 }.awaitAll()
             }
 
-            vectorChunkRepository.saveAll(vectorChunks)
+            saveVectorChunks(vectorChunks)
 
             logger.debug("✅ [필드 벡터화] 완료: $entity.$fieldName (${chunks.size}개 청크 DB 저장)")
 
@@ -111,76 +110,24 @@ class VectorProcessingService(
     }
 
     /**
-     * 텍스트를 토큰 기반으로 청킹
+     * 벡터 청크를 트랜잭션 단위로 batch 저장
      *
-     * 문장 단위로 분할하고 TARGET_TOKENS_PER_CHUNK를 기준으로 그룹화합니다.
+     * Spring @Transactional은 private 메서드에서 작동하지 않으므로 open으로 선언합니다.
+     * DB 일시적 실패에 대비하여 최대 3회 재시도합니다 (exponential backoff).
      */
-    private fun chunkText(text: String): List<String> {
-        if (text.isBlank()) return emptyList()
-
-        val totalTokens = tokenizerService.countTokens(text)
-
-        if (totalTokens <= TARGET_TOKENS_PER_CHUNK) {
-            return listOf(text.trim())
+    @Transactional
+    @Retryable(
+        retryFor = [SQLException::class],
+        maxAttempts = 3,
+        backoff = Backoff(delay = 1000, multiplier = 2.0)
+    )
+    open fun saveVectorChunks(vectorChunks: List<VectorChunk>) {
+        try {
+            vectorChunkRepository.saveAll(vectorChunks)
+            logger.debug("✓ 벡터 청크 저장 성공 (${vectorChunks.size}개)")
+        } catch (e: SQLException) {
+            logger.warn("⚠️ 벡터 청크 저장 실패, 재시도 예정: ${e.message}")
+            throw e
         }
-
-        val sentences = splitIntoSentences(text)
-        val chunks = mutableListOf<String>()
-        val currentChunk = StringBuilder()
-        var currentTokenCount = 0
-
-        for (sentence in sentences) {
-            val sentenceTokens = tokenizerService.countTokens(sentence)
-
-            if (sentenceTokens > MAX_TOKENS_PER_CHUNK) {
-                if (currentChunk.isNotEmpty()) {
-                    chunks.add(currentChunk.toString().trim())
-                    currentChunk.clear()
-                    currentTokenCount = 0
-                }
-
-                val truncated = tokenizerService.truncateToTokenLimit(sentence, MAX_TOKENS_PER_CHUNK)
-                chunks.add(truncated)
-                continue
-            }
-
-            if (currentTokenCount + sentenceTokens > TARGET_TOKENS_PER_CHUNK && currentChunk.isNotEmpty()) {
-                chunks.add(currentChunk.toString().trim())
-                currentChunk.clear()
-                currentTokenCount = 0
-            }
-
-            currentChunk.append(sentence).append(" ")
-            currentTokenCount += sentenceTokens
-        }
-
-        if (currentChunk.isNotEmpty()) {
-            chunks.add(currentChunk.toString().trim())
-        }
-
-        return chunks
-    }
-
-    /**
-     * 텍스트를 문장 단위로 분할
-     */
-    private fun splitIntoSentences(text: String): List<String> {
-        val sentencePattern = Regex("""[^.!?]*[.!?]+""")
-        val matches = sentencePattern.findAll(text)
-        val sentences = matches.map { it.value.trim() }.filter { it.isNotBlank() }.toList()
-
-        if (sentences.isEmpty()) {
-            return listOf(text.trim())
-        }
-
-        val lastMatchEnd = matches.lastOrNull()?.range?.last ?: -1
-        if (lastMatchEnd < text.length - 1) {
-            val remaining = text.substring(lastMatchEnd + 1).trim()
-            if (remaining.isNotBlank()) {
-                return sentences + remaining
-            }
-        }
-
-        return sentences
     }
 }
