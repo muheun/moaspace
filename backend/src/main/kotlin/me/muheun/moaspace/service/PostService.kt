@@ -6,6 +6,8 @@ import me.muheun.moaspace.dto.UpdatePostRequest
 import me.muheun.moaspace.repository.PostRepository
 import me.muheun.moaspace.repository.UserRepository
 import org.slf4j.LoggerFactory
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -128,5 +130,56 @@ class PostService(
         logger.info("게시글 벡터 재생성 완료: postId=$postId")
 
         return updatedPost
+    }
+
+    /**
+     * 게시글 목록 조회 (페이지네이션)
+     * T061: GET /api/posts 엔드포인트용
+     *
+     * 삭제되지 않은 게시글만 조회하며, 해시태그 필터링을 지원합니다.
+     *
+     * @param pageable 페이지 정보 (page, size, sort)
+     * @param hashtag 해시태그 필터 (선택적)
+     * @return Page<Post> 게시글 페이지
+     */
+    fun getAllPosts(pageable: Pageable, hashtag: String?): Page<Post> {
+        logger.debug("게시글 목록 조회: page=${pageable.pageNumber}, size=${pageable.pageSize}, hashtag=$hashtag")
+
+        return if (hashtag.isNullOrBlank()) {
+            postRepository.findByDeletedFalse(pageable)
+        } else {
+            postRepository.findByHashtagAndDeletedFalse(hashtag, pageable)
+        }
+    }
+
+    /**
+     * 게시글 삭제 (Soft Delete)
+     * T076: DELETE /api/posts/{id} 엔드포인트용
+     *
+     * 1. 게시글 조회 (삭제되지 않은 글만)
+     * 2. 소유권 검증 (작성자 본인만 삭제 가능)
+     * 3. deleted 플래그를 true로 설정
+     * 4. PostEmbedding은 유지 (복구 가능성 고려)
+     *
+     * @param postId 게시글 ID
+     * @param userId 요청자 ID (JWT에서 추출)
+     * @throws NoSuchElementException 게시글을 찾을 수 없을 경우
+     * @throws IllegalArgumentException 소유권이 없을 경우 (작성자 불일치)
+     */
+    @Transactional
+    fun deletePost(postId: Long, userId: Long) {
+        logger.info("게시글 삭제 시작: postId=$postId, userId=$userId")
+
+        val post = getPostById(postId)
+
+        if (post.author.id != userId) {
+            logger.warn("게시글 삭제 권한 없음: postId=$postId, authorId=${post.author.id}, requestUserId=$userId")
+            throw IllegalArgumentException("게시글을 삭제할 권한이 없습니다")
+        }
+
+        post.deleted = true
+        postRepository.save(post)
+
+        logger.info("게시글 소프트 삭제 완료: postId=$postId (deleted=true)")
     }
 }

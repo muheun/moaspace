@@ -404,4 +404,398 @@ class PostControllerTest {
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.error.code").value("POST_NOT_FOUND"))
     }
+
+    /**
+     * T065: 페이지네이션 테스트 (다양한 페이지 크기)
+     *
+     * 시나리오:
+     * 1. 30개의 게시글 생성
+     * 2. page=0, size=10으로 조회 → 10개 반환
+     * 3. page=1, size=10으로 조회 → 10개 반환
+     * 4. page=2, size=10으로 조회 → 10개 반환
+     * 5. totalElements=30, totalPages=3 확인
+     */
+    @Test
+    fun `should return paginated posts with correct pagination info`() {
+        // Given: 30개의 게시글 생성
+        val user = userRepository.save(
+            User(
+                email = "user@example.com",
+                name = "사용자",
+                profileImageUrl = null
+            )
+        )
+
+        repeat(30) { index ->
+            postRepository.save(
+                Post(
+                    title = "게시글 ${index + 1}",
+                    content = "<p>내용 ${index + 1}</p>",
+                    plainContent = "내용 ${index + 1}",
+                    author = user,
+                    hashtags = arrayOf("테스트")
+                )
+            )
+        }
+
+        val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
+
+        // When: GET /api/posts?page=0&size=10
+        val page0Result = mockMvc.perform(
+            get("/api/posts")
+                .param("page", "0")
+                .param("size", "10")
+                .header("Authorization", "Bearer $accessToken")
+        )
+            // Then: 10개 게시글 반환, totalElements=30, totalPages=3
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.posts.length()").value(10))
+            .andExpect(jsonPath("$.pagination.page").value(0))
+            .andExpect(jsonPath("$.pagination.size").value(10))
+            .andExpect(jsonPath("$.pagination.totalElements").value(30))
+            .andExpect(jsonPath("$.pagination.totalPages").value(3))
+            .andReturn()
+
+        // When: GET /api/posts?page=1&size=10
+        mockMvc.perform(
+            get("/api/posts")
+                .param("page", "1")
+                .param("size", "10")
+                .header("Authorization", "Bearer $accessToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.posts.length()").value(10))
+            .andExpect(jsonPath("$.pagination.page").value(1))
+
+        // When: GET /api/posts?page=2&size=10
+        mockMvc.perform(
+            get("/api/posts")
+                .param("page", "2")
+                .param("size", "10")
+                .header("Authorization", "Bearer $accessToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.posts.length()").value(10))
+            .andExpect(jsonPath("$.pagination.page").value(2))
+    }
+
+    /**
+     * T066: 해시태그 필터링 테스트
+     *
+     * 시나리오:
+     * 1. #AI 태그 게시글 5개 생성
+     * 2. #Backend 태그 게시글 3개 생성
+     * 3. GET /api/posts?hashtag=AI → 5개 반환
+     * 4. GET /api/posts?hashtag=Backend → 3개 반환
+     * 5. GET /api/posts (필터 없음) → 8개 반환
+     */
+    @Test
+    fun `should filter posts by hashtag`() {
+        // Given: 다양한 해시태그 게시글 생성
+        val user = userRepository.save(
+            User(
+                email = "user@example.com",
+                name = "사용자",
+                profileImageUrl = null
+            )
+        )
+
+        // #AI 태그 5개
+        repeat(5) { index ->
+            postRepository.save(
+                Post(
+                    title = "AI 게시글 ${index + 1}",
+                    content = "<p>AI 내용</p>",
+                    plainContent = "AI 내용",
+                    author = user,
+                    hashtags = arrayOf("AI", "Tech")
+                )
+            )
+        }
+
+        // #Backend 태그 3개
+        repeat(3) { index ->
+            postRepository.save(
+                Post(
+                    title = "Backend 게시글 ${index + 1}",
+                    content = "<p>Backend 내용</p>",
+                    plainContent = "Backend 내용",
+                    author = user,
+                    hashtags = arrayOf("Backend", "Server")
+                )
+            )
+        }
+
+        val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
+
+        // When: GET /api/posts?hashtag=AI
+        mockMvc.perform(
+            get("/api/posts")
+                .param("hashtag", "AI")
+                .header("Authorization", "Bearer $accessToken")
+        )
+            // Then: 5개 반환
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.posts.length()").value(5))
+            .andExpect(jsonPath("$.pagination.totalElements").value(5))
+
+        // When: GET /api/posts?hashtag=Backend
+        mockMvc.perform(
+            get("/api/posts")
+                .param("hashtag", "Backend")
+                .header("Authorization", "Bearer $accessToken")
+        )
+            // Then: 3개 반환
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.posts.length()").value(3))
+            .andExpect(jsonPath("$.pagination.totalElements").value(3))
+
+        // When: GET /api/posts (필터 없음)
+        mockMvc.perform(
+            get("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+        )
+            // Then: 8개 반환
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.pagination.totalElements").value(8))
+    }
+
+    /**
+     * T067: 벡터 검색 정확도 테스트 (임계값 필터링)
+     *
+     * 시나리오:
+     * 1. "인공지능 기술의 발전" 게시글 생성
+     * 2. "머신러닝과 딥러닝" 게시글 생성
+     * 3. "요리 레시피" 게시글 생성
+     * 4. POST /api/posts/search { query: "AI와 머신러닝", threshold: 0.6 }
+     * 5. 유사한 게시글 (1, 2)만 반환, 무관한 게시글 (3) 제외
+     * 6. 유사도 점수 포함 확인
+     */
+    @Test
+    fun `should return similar posts with threshold filtering and similarity scores`() {
+        // Given: 다양한 주제의 게시글 생성
+        val user = userRepository.save(
+            User(
+                email = "user@example.com",
+                name = "사용자",
+                profileImageUrl = null
+            )
+        )
+
+        val post1 = postRepository.save(
+            Post(
+                title = "인공지능 기술의 발전",
+                content = "<p>인공지능과 머신러닝 기술이 빠르게 발전하고 있습니다.</p>",
+                plainContent = "인공지능과 머신러닝 기술이 빠르게 발전하고 있습니다.",
+                author = user,
+                hashtags = arrayOf("AI", "ML")
+            )
+        )
+
+        val post2 = postRepository.save(
+            Post(
+                title = "머신러닝과 딥러닝",
+                content = "<p>머신러닝과 딥러닝은 AI의 핵심 기술입니다.</p>",
+                plainContent = "머신러닝과 딥러닝은 AI의 핵심 기술입니다.",
+                author = user,
+                hashtags = arrayOf("ML", "DL")
+            )
+        )
+
+        val post3 = postRepository.save(
+            Post(
+                title = "요리 레시피",
+                content = "<p>맛있는 파스타 만드는 법을 소개합니다.</p>",
+                plainContent = "맛있는 파스타 만드는 법을 소개합니다.",
+                author = user,
+                hashtags = arrayOf("요리", "레시피")
+            )
+        )
+
+        // 벡터화
+        postEmbeddingRepository.flush()
+        Thread.sleep(1000) // 벡터화 처리 대기
+
+        val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
+
+        val searchRequest = """
+            {
+                "query": "AI와 머신러닝",
+                "threshold": 0.6,
+                "limit": 20
+            }
+        """.trimIndent()
+
+        // When: POST /api/posts/search
+        mockMvc.perform(
+            post("/api/posts/search")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(searchRequest)
+        )
+            // Then: 유사한 게시글만 반환
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.results").isArray)
+            .andExpect(jsonPath("$.results[0].post").exists())
+            .andExpect(jsonPath("$.results[0].similarity").isNumber)
+            .andExpect(jsonPath("$.results[0].similarity").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.6)))
+    }
+
+    /**
+     * T079: 소프트 삭제 기능 테스트
+     *
+     * 시나리오:
+     * 1. 작성자가 게시글 생성
+     * 2. DELETE /api/posts/{id}로 삭제 요청
+     * 3. 204 No Content 응답 확인
+     * 4. DB에서 deleted=true 확인
+     */
+    @Test
+    fun `should soft delete post successfully`() {
+        // Given: 테스트용 사용자 및 게시글 생성
+        val user = userRepository.save(
+            User(
+                email = "author@example.com",
+                name = "작성자",
+                profileImageUrl = null
+            )
+        )
+
+        val post = postRepository.save(
+            Post(
+                title = "삭제될 게시글",
+                content = "<p>삭제될 내용</p>",
+                plainContent = "삭제될 내용",
+                author = user,
+                hashtags = arrayOf("삭제", "테스트")
+            )
+        )
+
+        val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
+
+        // When: DELETE /api/posts/{id}
+        mockMvc.perform(
+            delete("/api/posts/${post.id}")
+                .header("Authorization", "Bearer $accessToken")
+        )
+            // Then: 204 No Content
+            .andExpect(status().isNoContent)
+
+        // 소프트 삭제 확인
+        val deletedPost = postRepository.findById(post.id!!).get()
+        assert(deletedPost.deleted) { "게시글이 소프트 삭제되지 않았습니다 (deleted=false)" }
+    }
+
+    /**
+     * T080: 소유자가 아닌 경우 삭제 권한 실패 테스트
+     *
+     * 시나리오:
+     * 1. 작성자 A가 게시글 생성
+     * 2. 사용자 B가 DELETE /api/posts/{id} 시도
+     * 3. 403 Forbidden 응답 확인
+     * 4. 게시글이 삭제되지 않았는지 확인
+     */
+    @Test
+    fun `should return 403 when non-owner tries to delete post`() {
+        // Given: 작성자 A 및 게시글 생성
+        val authorA = userRepository.save(
+            User(
+                email = "author.a@example.com",
+                name = "작성자 A",
+                profileImageUrl = null
+            )
+        )
+
+        val post = postRepository.save(
+            Post(
+                title = "A의 게시글",
+                content = "<p>A가 작성한 내용</p>",
+                plainContent = "A가 작성한 내용",
+                author = authorA,
+                hashtags = arrayOf("A")
+            )
+        )
+
+        // 사용자 B 생성
+        val userB = userRepository.save(
+            User(
+                email = "user.b@example.com",
+                name = "사용자 B",
+                profileImageUrl = null
+            )
+        )
+
+        val accessTokenB = jwtTokenService.generateAccessToken(userB.id!!, userB.email)
+
+        // When: 사용자 B가 DELETE /api/posts/{id} 시도
+        mockMvc.perform(
+            delete("/api/posts/${post.id}")
+                .header("Authorization", "Bearer $accessTokenB")
+        )
+            // Then: 403 Forbidden
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.error.code").value("FORBIDDEN"))
+            .andExpect(jsonPath("$.error.message").value("게시글을 삭제할 권한이 없습니다"))
+
+        // 게시글이 삭제되지 않았는지 확인
+        val unchangedPost = postRepository.findById(post.id!!).get()
+        assert(!unchangedPost.deleted) { "게시글이 삭제되었습니다 (deleted=true)" }
+    }
+
+    /**
+     * T081: 삭제된 게시글이 목록 API에서 제외되는지 테스트
+     *
+     * 시나리오:
+     * 1. 게시글 5개 생성
+     * 2. 그 중 2개 소프트 삭제 (deleted=true)
+     * 3. GET /api/posts 호출
+     * 4. 삭제되지 않은 3개만 반환되는지 확인
+     * 5. totalElements=3 확인
+     */
+    @Test
+    fun `should exclude deleted posts from list API`() {
+        // Given: 5개의 게시글 생성
+        val user = userRepository.save(
+            User(
+                email = "user@example.com",
+                name = "사용자",
+                profileImageUrl = null
+            )
+        )
+
+        val posts = mutableListOf<Post>()
+        repeat(5) { index ->
+            val post = postRepository.save(
+                Post(
+                    title = "게시글 ${index + 1}",
+                    content = "<p>내용 ${index + 1}</p>",
+                    plainContent = "내용 ${index + 1}",
+                    author = user,
+                    hashtags = arrayOf("테스트")
+                )
+            )
+            posts.add(post)
+        }
+
+        // 2개 소프트 삭제 (첫 번째, 세 번째)
+        posts[0].deleted = true
+        posts[2].deleted = true
+        postRepository.saveAll(posts)
+
+        val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
+
+        // When: GET /api/posts
+        mockMvc.perform(
+            get("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+        )
+            // Then: 삭제되지 않은 3개만 반환
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.posts.length()").value(3))
+            .andExpect(jsonPath("$.pagination.totalElements").value(3))
+
+        // 반환된 게시글 ID 확인 (삭제되지 않은 게시글만)
+        val notDeletedIds = posts.filter { !it.deleted }.map { it.id }.toSet()
+        assert(notDeletedIds.size == 3) { "삭제되지 않은 게시글이 3개가 아닙니다" }
+    }
 }

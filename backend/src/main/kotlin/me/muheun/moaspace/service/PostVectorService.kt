@@ -123,4 +123,68 @@ class PostVectorService(
 
         return results
     }
+
+    /**
+     * 벡터 유사도 검색 (유사도 점수 포함)
+     * T063-T064: POST /api/posts/search 엔드포인트용
+     *
+     * Constitution Principle III: 임계값 이상의 결과만 반환
+     *
+     * @param queryText 검색 쿼리
+     * @param threshold 유사도 임계값 (0.0~1.0, 기본 0.6)
+     * @param limit 최대 결과 수 (기본 20)
+     * @return Pair<PostEmbedding 리스트, 유사도 점수 Map>
+     */
+    @Transactional(readOnly = true)
+    fun searchSimilarPostsWithScores(
+        queryText: String,
+        threshold: Double = 0.6,
+        limit: Int = 20
+    ): Pair<List<PostEmbedding>, Map<Long, Double>> {
+        require(threshold in 0.0..1.0) { "threshold는 0.0~1.0 사이여야 합니다: $threshold" }
+        require(limit > 0) { "limit는 0보다 커야 합니다: $limit" }
+
+        logger.info("벡터 검색 (점수 포함) 시작: query=${queryText.take(50)}, threshold=$threshold, limit=$limit")
+
+        val queryVector = vectorizeQuery(queryText)
+        val results = postEmbeddingRepository.findSimilarPosts(queryVector, threshold, limit)
+
+        val queryVectorArray = onnxEmbeddingService.generateEmbedding(queryText).toArray()
+        val similarities = results.associate { embedding ->
+            val similarity = 1.0 - cosineSimilarity(queryVectorArray, embedding.embedding)
+            embedding.id!! to similarity
+        }
+
+        logger.info("벡터 검색 완료: 결과 수=${results.size}")
+
+        return Pair(results, similarities)
+    }
+
+    /**
+     * 두 벡터 간의 코사인 거리 계산
+     *
+     * @param vec1 첫 번째 벡터
+     * @param vec2 두 번째 벡터
+     * @return 코사인 거리 (0.0~2.0, 0에 가까울수록 유사)
+     */
+    private fun cosineSimilarity(vec1: FloatArray, vec2: FloatArray): Double {
+        require(vec1.size == vec2.size) { "벡터 차원이 일치하지 않습니다: ${vec1.size} vs ${vec2.size}" }
+
+        var dotProduct = 0.0
+        var norm1 = 0.0
+        var norm2 = 0.0
+
+        for (i in vec1.indices) {
+            dotProduct += vec1[i] * vec2[i]
+            norm1 += vec1[i] * vec1[i]
+            norm2 += vec2[i] * vec2[i]
+        }
+
+        val magnitude = kotlin.math.sqrt(norm1) * kotlin.math.sqrt(norm2)
+        return if (magnitude > 0.0) {
+            1.0 - (dotProduct / magnitude) // 코사인 거리로 변환
+        } else {
+            1.0
+        }
+    }
 }

@@ -34,18 +34,19 @@ export interface PostResponse {
 }
 
 export interface PostListResponse {
-  content: PostSummary[];
-  pageable: {
+  posts: PostSummary[];
+  pagination: {
     page: number;
     size: number;
+    totalElements: number;
+    totalPages: number;
   };
-  totalElements: number;
-  totalPages: number;
 }
 
 export interface PostSummary {
   id: number;
   title: string;
+  excerpt: string;  // content의 첫 100자 미리보기
   author: {
     id: number;
     name: string;
@@ -53,6 +54,7 @@ export interface PostSummary {
   };
   hashtags: string[];
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface VectorSearchRequest {
@@ -66,7 +68,4 @@ export interface VectorSearchResponse {
     post: PostSummary;
     similarity: number;
   }>;
-  query: string;
-  threshold: number;
-  totalResults: number;
 }

@@ -2,14 +2,30 @@
 
 import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { LexicalEditor } from '@/components/editor/LexicalEditor';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { usePost, useUpdatePost } from '@/lib/hooks/usePosts';
 import { useAuth } from '@/lib/hooks/useAuth';
 
 /**
+ * T094: Lexical 에디터 지연 로딩 최적화
+ * next/dynamic을 사용하여 에디터를 사용할 때만 로드
+ */
+const LexicalEditor = dynamic(
+  () => import('@/components/editor/LexicalEditor').then(mod => ({ default: mod.LexicalEditor })),
+  {
+    loading: () => <Skeleton className="h-64 w-full" />,
+    ssr: false, // 클라이언트 전용 컴포넌트
+  }
+);
+
+/**
  * 게시글 수정 페이지
+ * T090: Error Boundary 적용
  *
  * Constitution Principle VI: shadcn/ui 기반 컴포넌트 우선 아키텍처
  * Constitution Principle VIII: content (HTML) + plainContent (Plain Text) 분리 저장
@@ -61,7 +77,7 @@ export default function EditPostPage({
     e.preventDefault();
 
     if (!user) {
-      alert('로그인이 필요합니다');
+      toast.error('로그인이 필요합니다');
       router.push('/login');
       return;
     }
@@ -71,18 +87,18 @@ export default function EditPostPage({
     }
 
     if (user.id !== post.author.id) {
-      alert('본인이 작성한 게시글만 수정할 수 있습니다');
+      toast.error('본인이 작성한 게시글만 수정할 수 있습니다');
       router.push(`/posts/${postId}`);
       return;
     }
 
     if (!title.trim()) {
-      alert('제목을 입력하세요');
+      toast.error('제목을 입력하세요');
       return;
     }
 
     if (!plainContent.trim()) {
-      alert('내용을 입력하세요');
+      toast.error('내용을 입력하세요');
       return;
     }
 
@@ -103,11 +119,12 @@ export default function EditPostPage({
       },
       {
         onSuccess: () => {
+          toast.success('게시글이 수정되었습니다!');
           router.push(`/posts/${postId}`);
         },
         onError: (err) => {
           console.error('게시글 수정 실패:', err);
-          alert('게시글 수정에 실패했습니다. 다시 시도해주세요.');
+          toast.error(err instanceof Error ? err.message : '게시글 수정에 실패했습니다.');
         },
       }
     );
@@ -115,15 +132,24 @@ export default function EditPostPage({
 
   /**
    * 로딩 상태
+   * T089: Skeleton 컴포넌트로 로딩 상태 개선
    */
   if (isPostLoading || isAuthLoading) {
     return (
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="space-y-4">
-            <div className="h-10 bg-gray-200 rounded"></div>
-            <div className="h-64 bg-gray-200 rounded"></div>
+      <main className="container mx-auto px-4 py-8 max-w-4xl" role="status" aria-label="페이지 로딩 중">
+        <Skeleton className="h-8 w-1/4 mb-8" />
+        <div className="space-y-6">
+          <div>
+            <Skeleton className="h-5 w-20 mb-2" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div>
+            <Skeleton className="h-5 w-20 mb-2" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+          <div>
+            <Skeleton className="h-5 w-28 mb-2" />
+            <Skeleton className="h-10 w-full" />
           </div>
         </div>
       </main>
@@ -188,10 +214,11 @@ export default function EditPostPage({
   }
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-8">게시글 수정</h1>
+    <ErrorBoundary>
+      <main className="container mx-auto px-4 py-8 max-w-4xl">
+        <h1 className="text-3xl font-bold mb-8">게시글 수정</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label
             htmlFor="title"
@@ -277,6 +304,7 @@ export default function EditPostPage({
           </Button>
         </div>
       </form>
-    </main>
+      </main>
+    </ErrorBoundary>
   );
 }

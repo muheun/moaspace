@@ -1,12 +1,13 @@
 package me.muheun.moaspace.controller
 
 import jakarta.validation.Valid
-import me.muheun.moaspace.dto.CreatePostRequest
-import me.muheun.moaspace.dto.PostResponse
-import me.muheun.moaspace.dto.UpdatePostRequest
+import me.muheun.moaspace.dto.*
 import me.muheun.moaspace.service.JwtTokenService
 import me.muheun.moaspace.service.PostService
+import me.muheun.moaspace.service.PostVectorService
 import org.slf4j.LoggerFactory
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -14,10 +15,11 @@ import java.time.LocalDateTime
 
 /**
  * 게시글 컨트롤러
- * T043-046: 게시글 CRUD 엔드포인트 구현
+ * T043-046, T061-062: 게시글 CRUD 및 조회 엔드포인트 구현
  *
  * 주요 엔드포인트:
  * - POST /api/posts: 게시글 생성 (JWT 인증 필요)
+ * - GET /api/posts: 게시글 목록 조회 (페이지네이션, 해시태그 필터)
  * - GET /api/posts/{id}: 게시글 조회 (JWT 인증 필요)
  * - PUT /api/posts/{id}: 게시글 수정 (JWT 인증 + 소유권 검증)
  *
@@ -27,6 +29,7 @@ import java.time.LocalDateTime
 @RequestMapping("/api/posts")
 class PostController(
     private val postService: PostService,
+    private val postVectorService: PostVectorService,
     private val jwtTokenService: JwtTokenService
 ) {
 
@@ -60,6 +63,42 @@ class PostController(
         logger.info("게시글 생성 완료: postId=${post.id}, userId=$userId")
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response)
+    }
+
+    /**
+     * 게시글 목록 조회 (페이지네이션 + 해시태그 필터)
+     * T061-T062: GET /api/posts 엔드포인트 구현
+     *
+     * 삭제되지 않은 게시글만 조회하며, 최신순으로 정렬됩니다.
+     * 해시태그 파라미터가 제공되면 해당 해시태그를 포함하는 게시글만 반환합니다.
+     *
+     * @param page 페이지 번호 (0-based, 기본값: 0)
+     * @param size 페이지 크기 (기본값: 20, 최대: 100)
+     * @param hashtag 해시태그 필터 (선택적)
+     * @param authorization JWT 토큰 (인증 확인용)
+     * @return PostListResponse (게시글 목록 + 페이지네이션 정보)
+     * @throws IllegalArgumentException JWT 토큰이 없거나 유효하지 않을 경우 (401)
+     */
+    @GetMapping
+    fun getAllPosts(
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int,
+        @RequestParam(required = false) hashtag: String?,
+        @RequestHeader("Authorization", required = false) authorization: String?
+    ): ResponseEntity<PostListResponse> {
+        extractUserIdFromToken(authorization)
+
+        val pageSize = minOf(size, 100)
+        val pageable = PageRequest.of(page, pageSize, Sort.by(Sort.Direction.DESC, "createdAt"))
+
+        logger.info("게시글 목록 조회 요청: page=$page, size=$pageSize, hashtag=$hashtag")
+
+        val postPage = postService.getAllPosts(pageable, hashtag)
+        val response = PostListResponse.from(postPage)
+
+        logger.info("게시글 목록 조회 완료: totalElements=${postPage.totalElements}, totalPages=${postPage.totalPages}")
+
+        return ResponseEntity.ok(response)
     }
 
     /**
@@ -120,6 +159,71 @@ class PostController(
         logger.info("게시글 수정 완료: postId=$id, userId=$userId")
 
         return ResponseEntity.ok(response)
+    }
+
+    /**
+     * 벡터 검색
+     * T063-T064: POST /api/posts/search 엔드포인트 구현
+     *
+     * 게시글의 plainContent를 벡터화하여 유사도 검색을 수행합니다.
+     * Constitution Principle III: 임계값 이상의 결과만 반환
+     *
+     * @param request 검색 요청 (query, threshold, limit)
+     * @param authorization JWT 토큰 (인증 확인용)
+     * @return VectorSearchResponse (검색 결과 + 유사도 점수)
+     * @throws IllegalArgumentException JWT 토큰이 없거나 유효하지 않을 경우 (401)
+     * @throws IllegalArgumentException threshold 또는 limit 값이 유효하지 않을 경우 (400)
+     */
+    @PostMapping("/search")
+    fun searchPosts(
+        @Valid @RequestBody request: PostSearchRequest,
+        @RequestHeader("Authorization", required = false) authorization: String?
+    ): ResponseEntity<VectorSearchResponse> {
+        extractUserIdFromToken(authorization)
+
+        logger.info("벡터 검색 요청: query=${request.query.take(50)}, threshold=${request.threshold}, limit=${request.limit}")
+
+        val (postEmbeddings, similarities) = postVectorService.searchSimilarPostsWithScores(
+            queryText = request.query,
+            threshold = request.threshold,
+            limit = request.limit
+        )
+
+        val response = VectorSearchResponse.from(postEmbeddings, similarities)
+
+        logger.info("벡터 검색 완료: 결과 수=${response.results.size}")
+
+        return ResponseEntity.ok(response)
+    }
+
+    /**
+     * 게시글 삭제 (Soft Delete)
+     * T076-T077: DELETE /api/posts/{id} 엔드포인트 구현
+     *
+     * 작성자 본인만 삭제할 수 있습니다.
+     * 실제로 데이터를 삭제하지 않고 deleted=true로 설정합니다.
+     *
+     * @param id 게시글 ID
+     * @param authorization "Bearer {token}" 형식의 JWT 토큰
+     * @return 204 No Content (삭제 성공)
+     * @throws IllegalArgumentException JWT 토큰이 없거나 유효하지 않을 경우 (401)
+     * @throws IllegalArgumentException 소유권이 없을 경우 (403)
+     * @throws NoSuchElementException 게시글을 찾을 수 없을 경우 (404)
+     */
+    @DeleteMapping("/{id}")
+    fun deletePost(
+        @PathVariable id: Long,
+        @RequestHeader("Authorization", required = false) authorization: String?
+    ): ResponseEntity<Void> {
+        val userId = extractUserIdFromToken(authorization)
+
+        logger.info("게시글 삭제 요청: postId=$id, userId=$userId")
+
+        postService.deletePost(id, userId)
+
+        logger.info("게시글 삭제 완료: postId=$id, userId=$userId")
+
+        return ResponseEntity.noContent().build()
     }
 
     /**

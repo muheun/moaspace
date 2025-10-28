@@ -86,8 +86,9 @@ frontend:
 vector:
   embedding:
     provider: onnx  # 임베딩 제공자 (onnx, openai, mock 등)
-    model-path: ${ONNX_MODEL_PATH}  # ONNX 모델 파일 경로 (환경변수)
-    tokenizer-path: ${ONNX_TOKENIZER_PATH}  # HuggingFace Tokenizer 파일 경로 (환경변수)
+    # 환경변수에서 읽음 (.env 파일)
+    model-path: ${ONNX_MODEL_PATH}
+    tokenizer-path: ${ONNX_TOKENIZER_PATH}
     dimension: 768  # MPNet-base-v2 벡터 차원 (MiniLM에서 전환)
     max-tokens: 512  # 최대 토큰 길이 (truncate)
 

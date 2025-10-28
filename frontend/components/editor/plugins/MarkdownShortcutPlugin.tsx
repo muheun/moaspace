@@ -14,8 +14,6 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import {
-  $convertFromMarkdownString,
-  $convertToMarkdownString,
   TRANSFORMERS,
 } from '@lexical/markdown';
 
@@ -24,10 +22,8 @@ export function MarkdownShortcutPlugin() {
 
   useEffect(() => {
     // 마크다운 변환기 등록
-    return editor.registerUpdateListener(({ editorState }) => {
-      editorState.read(() => {
-        const markdown = $convertToMarkdownString(TRANSFORMERS);
-        // 필요 시 마크다운 변환 로직 추가
+    return editor.registerUpdateListener(() => {
+      // 필요 시 마크다운 변환 로직 추가
       });
     });
   }, [editor]);
