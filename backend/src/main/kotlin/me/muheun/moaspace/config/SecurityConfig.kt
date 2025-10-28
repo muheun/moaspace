@@ -14,6 +14,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
  * Spring Security 설정
  * T018: Google용 Spring Security OAuth2 Client 설정
  * T020: 프론트엔드 origin (localhost:3000) 허용을 위한 CORS 설정
+ * T029: OAuth2SuccessHandler 등록
  *
  * 주요 기능:
  * - Google OAuth2 로그인 설정
@@ -23,7 +24,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
  */
 @Configuration
 @EnableWebSecurity
-class SecurityConfig {
+class SecurityConfig(
+    private val oauth2SuccessHandler: me.muheun.moaspace.security.OAuth2SuccessHandler
+) {
 
     /**
      * Security Filter Chain 설정
@@ -58,6 +61,9 @@ class SecurityConfig {
                         "/oauth2/**"
                     ).permitAll()
 
+                    // API 엔드포인트 (JWT 인증은 컨트롤러에서 처리)
+                    .requestMatchers("/api/**").permitAll()
+
                     // 나머지 모든 요청은 인증 필요
                     .anyRequest().authenticated()
             }
@@ -73,8 +79,8 @@ class SecurityConfig {
                         redirection.baseUri("/login/oauth2/code/*")
                     }
 
-                    // 인증 성공 핸들러는 Phase 3에서 구현 예정 (OAuth2SuccessHandler)
-                    // .successHandler(oAuth2SuccessHandler)
+                    // OAuth2 인증 성공 핸들러 등록 (T029)
+                    .successHandler(oauth2SuccessHandler)
             }
 
         return http.build()

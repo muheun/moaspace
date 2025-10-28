@@ -46,6 +46,20 @@ spring:
         order_updates: true
     open-in-view: false
 
+  # Google OAuth2 설정 (T018)
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope:
+              - email
+              - profile
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            authorization-grant-type: authorization_code
+
 server:
   port: 8080
 
@@ -64,20 +78,9 @@ jwt:
   access-token-expiration: 3600000  # 1시간 (밀리초)
   refresh-token-expiration: 604800000  # 7일 (밀리초)
 
-# Google OAuth2 설정 (T018)
-spring:
-  security:
-    oauth2:
-      client:
-        registration:
-          google:
-            client-id: ${GOOGLE_CLIENT_ID}
-            client-secret: ${GOOGLE_CLIENT_SECRET}
-            scope:
-              - email
-              - profile
-            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
-            authorization-grant-type: authorization_code
+# Frontend URL 설정 (OAuth2 리다이렉트용)
+frontend:
+  url: ${FRONTEND_URL:http://localhost:3000}
 
 # 벡터 임베딩 설정 (DJL 기반 ONNX 모델)
 vector:
