@@ -1,14 +1,19 @@
--- 테스트 전 DB 초기화 스크립트
--- TRUNCATE를 사용하여 데이터 삭제 + 시퀀스 자동 리셋
+-- 테스트 데이터 정리 스크립트
+-- Constitution Principle V: 실제 DB 연동 테스트를 위한 테스트 전 정리
 
--- 1. Foreign key constraint를 무시하고 모든 데이터 삭제
-SET session_replication_role = replica;
+-- 외래 키 제약 조건으로 인해 순서 중요:
+-- post_embeddings → posts → users 순서로 삭제
 
--- 2. TRUNCATE로 데이터 삭제 및 시퀀스 리셋 (RESTART IDENTITY)
--- content_chunks 테이블은 Phase 0-2에서 제거됨 (레거시 정리)
-TRUNCATE TABLE vector_chunk RESTART IDENTITY CASCADE;
-TRUNCATE TABLE posts RESTART IDENTITY CASCADE;
-TRUNCATE TABLE vector_config RESTART IDENTITY CASCADE;
+-- 1. PostEmbedding 테이블 정리
+DELETE FROM post_embeddings;
 
--- 3. Foreign key constraint 다시 활성화
-SET session_replication_role = DEFAULT;
+-- 2. Post 테이블 정리
+DELETE FROM posts;
+
+-- 3. User 테이블 정리
+DELETE FROM users;
+
+-- 시퀀스 리셋 (AUTO_INCREMENT ID 초기화)
+ALTER SEQUENCE users_id_seq RESTART WITH 1;
+ALTER SEQUENCE posts_id_seq RESTART WITH 1;
+ALTER SEQUENCE post_embeddings_id_seq RESTART WITH 1;
