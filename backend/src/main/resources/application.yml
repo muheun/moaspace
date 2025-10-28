@@ -25,6 +25,11 @@ spring:
     out-of-order: false  # 순서대로 마이그레이션 강제
     placeholder-replacement: false  # 플레이스홀더 치환 비활성화
 
+  # Spring Cache 설정 (Phase 1 - VectorConfig 캐싱)
+  cache:
+    type: simple  # in-memory 캐시 (Phase 2+: redis)
+    cache-names: vectorConfig
+
   jpa:
     hibernate:
       ddl-auto: validate  # Flyway가 스키마 관리, JPA는 검증만 수행
@@ -36,6 +41,7 @@ spring:
         # Batch Insert 설정 (성능 향상)
         jdbc:
           batch_size: 50
+          time_zone: UTC  # 타임스탬프 UTC 처리
         order_inserts: true
         order_updates: true
     open-in-view: false

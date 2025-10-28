@@ -8,6 +8,7 @@ SET session_replication_role = replica;
 -- content_chunks 테이블은 Phase 0-2에서 제거됨 (레거시 정리)
 TRUNCATE TABLE vector_chunk RESTART IDENTITY CASCADE;
 TRUNCATE TABLE posts RESTART IDENTITY CASCADE;
+TRUNCATE TABLE vector_config RESTART IDENTITY CASCADE;
 
 -- 3. Foreign key constraint 다시 활성화
 SET session_replication_role = DEFAULT;

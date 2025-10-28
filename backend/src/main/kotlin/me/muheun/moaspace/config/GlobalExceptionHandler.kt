@@ -39,6 +39,26 @@ class GlobalExceptionHandler {
     }
 
     /**
+     * 비즈니스 로직 위반 (중복 생성 등)
+     *
+     * VectorConfig 중복 생성 시 409 Conflict 반환
+     * 기타 비즈니스 로직 위반 시 400 Bad Request 반환
+     */
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleIllegalArgumentException(ex: IllegalArgumentException): ResponseEntity<ErrorResponse> {
+        // VectorConfig 중복 생성 감지
+        val isDuplicateVectorConfig = ex.message?.contains("이미 존재하는 설정입니다") == true
+
+        val status = if (isDuplicateVectorConfig) HttpStatus.CONFLICT else HttpStatus.BAD_REQUEST
+        val errorResponse = ErrorResponse(
+            status = status.value(),
+            error = if (isDuplicateVectorConfig) "Conflict" else "Bad Request",
+            message = ex.message ?: "잘못된 요청입니다"
+        )
+        return ResponseEntity.status(status).body(errorResponse)
+    }
+
+    /**
      * 유효성 검사 실패 시
      */
     @ExceptionHandler(MethodArgumentNotValidException::class)
