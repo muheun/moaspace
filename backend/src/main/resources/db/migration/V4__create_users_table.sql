@@ -1,7 +1,7 @@
 -- Users 테이블 생성 (Google OAuth 사용자 저장)
 -- Constitution Principle I 준수: 운영 사용자 데이터는 DB에 저장
 CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(100) NOT NULL,
     profile_image_url TEXT,

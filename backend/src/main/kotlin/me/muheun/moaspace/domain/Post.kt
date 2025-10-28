@@ -1,6 +1,7 @@
 package me.muheun.moaspace.domain
 
 import jakarta.persistence.*
+import me.muheun.moaspace.domain.user.User
 import java.time.LocalDateTime
 
 @Entity
@@ -16,11 +17,18 @@ class Post(
     @Column(nullable = false, columnDefinition = "TEXT")
     var content: String,
 
-    @Column(name = "plain_content", columnDefinition = "TEXT")
-    var plainContent: String? = null,
+    @Column(name = "plain_content", nullable = false, columnDefinition = "TEXT")
+    var plainContent: String,
 
-    @Column(nullable = false, length = 100)
-    var author: String,
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "author_id", nullable = false)
+    var author: User,
+
+    @Column(columnDefinition = "TEXT[]")
+    var hashtags: Array<String> = emptyArray(),
+
+    @Column(nullable = false)
+    var deleted: Boolean = false,
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),

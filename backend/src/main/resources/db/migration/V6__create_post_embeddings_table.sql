@@ -3,8 +3,8 @@
 -- Constitution Principle IV 준수: 임베딩 모델 변경 시 마이그레이션 계획 필요
 
 CREATE TABLE post_embeddings (
-    id SERIAL PRIMARY KEY,
-    post_id INTEGER UNIQUE NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    id BIGSERIAL PRIMARY KEY,
+    post_id BIGINT UNIQUE NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
     embedding vector(768) NOT NULL,     -- 768차원 벡터 (multilingual-e5-base)
     model_name VARCHAR(50) DEFAULT 'multilingual-e5-base',
     created_at TIMESTAMP DEFAULT NOW()

@@ -6,11 +6,11 @@ DROP TABLE IF EXISTS post_embeddings CASCADE;
 DROP TABLE IF EXISTS posts CASCADE;
 
 CREATE TABLE posts (
-    id SERIAL PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
     content TEXT NOT NULL,               -- HTML 포맷 (Lexical 에디터 출력)
     plain_content TEXT NOT NULL,         -- Plain Text (벡터화 대상)
-    author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    author_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     hashtags TEXT[] DEFAULT '{}',
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),

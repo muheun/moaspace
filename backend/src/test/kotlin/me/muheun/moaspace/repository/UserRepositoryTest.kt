@@ -1,36 +1,32 @@
-package com.example.vectorai.domain.user
+package me.muheun.moaspace.repository
 
-import me.muheun.moaspace.VectorBoardApplication
+import me.muheun.moaspace.domain.user.User
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
-import org.springframework.test.context.ContextConfiguration
 import org.springframework.test.context.jdbc.Sql
 
 /**
  * UserRepository 영속성 테스트
- *
- * Constitution Principle V: 실제 DB 연동 테스트 필수 (Mock 금지)
+ * Constitution Principle V: 실제 DB 연동 테스트 (@DataJpaTest + AutoConfigureTestDatabase.Replace.NONE)
+ * Mock 테스트 절대 금지
  */
-@DataJpaTest(excludeAutoConfiguration = [
-    org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration::class
-])
-@ContextConfiguration(classes = [VectorBoardApplication::class])
+@DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Sql("/test-cleanup.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class UserRepositoryTest {
 
     @Autowired
-    lateinit var entityManager: TestEntityManager
+    private lateinit var entityManager: TestEntityManager
 
     @Autowired
-    lateinit var userRepository: UserRepository
+    private lateinit var userRepository: UserRepository
 
     @Test
-    fun `should save user and generate ID`() {
+    fun `should save user with all fields`() {
         // Given
         val user = User(
             email = "test@example.com",
@@ -39,13 +35,13 @@ class UserRepositoryTest {
         )
 
         // When
-        val savedUser = entityManager.persist(user)
-        entityManager.flush()
+        val savedUser = entityManager.persistAndFlush(user)
 
         // Then
         assertNotNull(savedUser.id)
         assertEquals("test@example.com", savedUser.email)
         assertEquals("테스트 사용자", savedUser.name)
+        assertEquals("https://via.placeholder.com/150", savedUser.profileImageUrl)
         assertNotNull(savedUser.createdAt)
     }
 
@@ -53,38 +49,36 @@ class UserRepositoryTest {
     fun `should find user by email`() {
         // Given
         val user = User(
-            email = "unique@example.com",
-            name = "유니크 사용자"
+            email = "find@example.com",
+            name = "검색 사용자"
         )
-        entityManager.persist(user)
-        entityManager.flush()
+        entityManager.persistAndFlush(user)
 
         // When
-        val foundUser = userRepository.findByEmail("unique@example.com")
+        val foundUser = userRepository.findByEmail("find@example.com")
 
         // Then
         assertTrue(foundUser.isPresent)
-        assertEquals("유니크 사용자", foundUser.get().name)
+        assertEquals("검색 사용자", foundUser.get().name)
     }
 
     @Test
-    fun `should return empty optional when user not found by email`() {
+    fun `should return empty when user not found by email`() {
         // When
         val foundUser = userRepository.findByEmail("nonexistent@example.com")
 
         // Then
-        assertTrue(foundUser.isEmpty)
+        assertFalse(foundUser.isPresent)
     }
 
     @Test
-    fun `should check email existence`() {
+    fun `should check if user exists by email`() {
         // Given
         val user = User(
             email = "exists@example.com",
-            name = "존재하는 사용자"
+            name = "존재 확인 사용자"
         )
-        entityManager.persist(user)
-        entityManager.flush()
+        entityManager.persistAndFlush(user)
 
         // When & Then
         assertTrue(userRepository.existsByEmail("exists@example.com"))
@@ -95,21 +89,36 @@ class UserRepositoryTest {
     fun `should enforce unique email constraint`() {
         // Given
         val user1 = User(
-            email = "duplicate@example.com",
-            name = "사용자 1"
+            email = "unique@example.com",
+            name = "사용자1"
         )
-        entityManager.persist(user1)
-        entityManager.flush()
+        entityManager.persistAndFlush(user1)
 
         // When & Then
         val user2 = User(
-            email = "duplicate@example.com",
-            name = "사용자 2"
+            email = "unique@example.com", // 동일한 이메일
+            name = "사용자2"
         )
 
         assertThrows(Exception::class.java) {
-            entityManager.persist(user2)
-            entityManager.flush()
+            entityManager.persistAndFlush(user2)
         }
+    }
+
+    @Test
+    fun `should save user with null profileImageUrl`() {
+        // Given
+        val user = User(
+            email = "noimage@example.com",
+            name = "이미지 없는 사용자",
+            profileImageUrl = null
+        )
+
+        // When
+        val savedUser = entityManager.persistAndFlush(user)
+
+        // Then
+        assertNotNull(savedUser.id)
+        assertNull(savedUser.profileImageUrl)
     }
 }
