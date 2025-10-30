@@ -11,7 +11,7 @@ import java.time.LocalDateTime
  */
 @Entity
 @Table(
-    name = "vector_config",
+    name = "vector_configs",
     uniqueConstraints = [
         UniqueConstraint(
             name = "uq_entity_field",
@@ -19,8 +19,8 @@ import java.time.LocalDateTime
         )
     ],
     indexes = [
-        Index(name = "idx_vector_config_entity_type", columnList = "entity_type"),
-        Index(name = "idx_vector_config_enabled", columnList = "enabled")
+        Index(name = "idx_vector_configs_entity_type", columnList = "entity_type"),
+        Index(name = "idx_vector_configs_enabled", columnList = "enabled")
     ]
 )
 class VectorConfig(

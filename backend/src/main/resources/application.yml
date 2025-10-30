@@ -46,6 +46,20 @@ spring:
         order_updates: true
     open-in-view: false
 
+  # Google OAuth2 설정 (T018)
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope:
+              - email
+              - profile
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            authorization-grant-type: authorization_code
+
 server:
   port: 8080
 
@@ -58,12 +72,23 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{requestId}] %-5level %logger{36} - %msg%n"
 
+# JWT 설정 (T019)
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: 3600000  # 1시간 (밀리초)
+  refresh-token-expiration: 604800000  # 7일 (밀리초)
+
+# Frontend URL 설정 (OAuth2 리다이렉트용)
+frontend:
+  url: ${FRONTEND_URL:http://localhost:3000}
+
 # 벡터 임베딩 설정 (DJL 기반 ONNX 모델)
 vector:
   embedding:
     provider: onnx  # 임베딩 제공자 (onnx, openai, mock 등)
-    model-path: ${ONNX_MODEL_PATH}  # ONNX 모델 파일 경로 (환경변수)
-    tokenizer-path: ${ONNX_TOKENIZER_PATH}  # HuggingFace Tokenizer 파일 경로 (환경변수)
+    # 환경변수에서 읽음 (.env 파일)
+    model-path: ${ONNX_MODEL_PATH}
+    tokenizer-path: ${ONNX_TOKENIZER_PATH}
     dimension: 768  # MPNet-base-v2 벡터 차원 (MiniLM에서 전환)
     max-tokens: 512  # 최대 토큰 길이 (truncate)
 
