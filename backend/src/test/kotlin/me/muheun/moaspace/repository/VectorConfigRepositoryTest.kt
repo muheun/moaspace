@@ -2,6 +2,7 @@ package me.muheun.moaspace.repository
 
 import me.muheun.moaspace.domain.VectorConfig
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
@@ -27,8 +28,16 @@ class VectorConfigRepositoryTest {
     @Autowired
     private lateinit var vectorConfigRepository: VectorConfigRepository
 
+    /**
+     * VectorConfig 저장 및 조회 테스트
+     *
+     * Given: VectorConfig 엔티티 생성
+     * When: save() 호출 후 findById()로 조회
+     * Then: 저장된 데이터 정상 조회 및 모든 필드값 일치
+     */
     @Test
-    fun `VectorConfig 저장 및 조회 테스트`() {
+    @DisplayName("testSaveAndFindById - VectorConfig를 저장하고 조회한다")
+    fun testSaveAndFindById() {
         // given
         val config = VectorConfig(
             entityType = "Post",
@@ -55,8 +64,16 @@ class VectorConfigRepositoryTest {
         assertThat(found.get().entityType).isEqualTo("Post")
     }
 
+    /**
+     * findByEntityType 테스트
+     *
+     * Given: Post(2개), Comment(1개) 설정 저장
+     * When: findByEntityType("Post") 호출
+     * Then: Post 타입 설정 2개만 조회
+     */
     @Test
-    fun `findByEntityType 테스트`() {
+    @DisplayName("testFindByEntityType - entityType으로 설정 목록을 조회한다")
+    fun testFindByEntityType() {
         // given
         vectorConfigRepository.save(
             VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0)
@@ -77,8 +94,16 @@ class VectorConfigRepositoryTest {
             .containsExactlyInAnyOrder("title", "content")
     }
 
+    /**
+     * findByEntityTypeAndFieldName 테스트 - 존재하는 경우
+     *
+     * Given: Post.title 설정 저장
+     * When: findByEntityTypeAndFieldName("Post", "title") 호출
+     * Then: 해당 설정 조회 성공
+     */
     @Test
-    fun `findByEntityTypeAndFieldName 테스트 - 존재하는 경우`() {
+    @DisplayName("testFindByEntityTypeAndFieldNameExists - entityType과 fieldName으로 설정을 조회한다")
+    fun testFindByEntityTypeAndFieldNameExists() {
         // given
         vectorConfigRepository.save(
             VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0)
@@ -92,8 +117,16 @@ class VectorConfigRepositoryTest {
         assertThat(config?.weight).isEqualTo(2.0)
     }
 
+    /**
+     * findByEntityTypeAndFieldName 테스트 - 존재하지 않는 경우
+     *
+     * Given: 설정 없음
+     * When: 존재하지 않는 fieldName으로 조회
+     * Then: null 반환
+     */
     @Test
-    fun `findByEntityTypeAndFieldName 테스트 - 존재하지 않는 경우`() {
+    @DisplayName("testFindByEntityTypeAndFieldNameNotFound - 존재하지 않는 설정 조회 시 null을 반환한다")
+    fun testFindByEntityTypeAndFieldNameNotFound() {
         // when
         val config = vectorConfigRepository.findByEntityTypeAndFieldName("Post", "nonexistent")
 
@@ -101,8 +134,16 @@ class VectorConfigRepositoryTest {
         assertThat(config).isNull()
     }
 
+    /**
+     * 복합 유니크 키 제약 테스트 - 중복 삽입 실패
+     *
+     * Given: Post.title 설정 이미 존재
+     * When: 동일한 entityType + fieldName으로 재삽입 시도
+     * Then: DataIntegrityViolationException 발생 (UNIQUE 제약)
+     */
     @Test
-    fun `복합 유니크 키 제약 테스트 - 중복 삽입 실패`() {
+    @DisplayName("testUniqueConstraintViolation - 중복된 entityType과 fieldName 삽입 시 예외가 발생한다")
+    fun testUniqueConstraintViolation() {
         // given
         vectorConfigRepository.save(
             VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0)
@@ -116,8 +157,16 @@ class VectorConfigRepositoryTest {
         }
     }
 
+    /**
+     * VectorConfig 수정 테스트
+     *
+     * Given: 기존 설정 저장
+     * When: weight, threshold, enabled 필드 수정 후 save()
+     * Then: 수정된 값으로 업데이트 성공
+     */
     @Test
-    fun `VectorConfig 수정 테스트`() {
+    @DisplayName("testUpdate - VectorConfig 필드를 수정한다")
+    fun testUpdate() {
         // given
         val config = vectorConfigRepository.save(
             VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, threshold = 0.0)
@@ -135,8 +184,16 @@ class VectorConfigRepositoryTest {
         assertThat(updated.enabled).isFalse()
     }
 
+    /**
+     * VectorConfig 삭제 테스트
+     *
+     * Given: 기존 설정 저장
+     * When: delete() 호출
+     * Then: 조회 시 Empty 반환 (물리적 삭제)
+     */
     @Test
-    fun `VectorConfig 삭제 테스트`() {
+    @DisplayName("testDelete - VectorConfig를 삭제한다")
+    fun testDelete() {
         // given
         val config = vectorConfigRepository.save(
             VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0)
@@ -151,8 +208,16 @@ class VectorConfigRepositoryTest {
         assertThat(found).isEmpty
     }
 
+    /**
+     * 모든 VectorConfig 조회 테스트
+     *
+     * Given: 여러 설정 저장
+     * When: findAll() 호출
+     * Then: 모든 설정 조회 (최소 2개 이상)
+     */
     @Test
-    fun `모든 VectorConfig 조회 테스트`() {
+    @DisplayName("testFindAll - 모든 VectorConfig 설정을 조회한다")
+    fun testFindAll() {
         // given
         vectorConfigRepository.save(
             VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0)

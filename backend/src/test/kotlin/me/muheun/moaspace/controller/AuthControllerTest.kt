@@ -3,6 +3,7 @@ package me.muheun.moaspace.controller
 import me.muheun.moaspace.domain.user.User
 import me.muheun.moaspace.repository.UserRepository
 import me.muheun.moaspace.service.JwtTokenService
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -44,16 +45,15 @@ class AuthControllerTest {
     private lateinit var jwtTokenService: JwtTokenService
 
     /**
-     * T034: Mock 요청으로 JWT 토큰 검증 테스트
+     * T034: JWT 토큰 검증 테스트
      *
-     * 시나리오:
-     * 1. 테스트용 사용자 생성
-     * 2. JWT 액세스 토큰 생성
-     * 3. Authorization 헤더에 토큰 포함하여 GET /api/auth/me 호출
-     * 4. 200 OK 응답 및 사용자 정보 반환 확인
+     * Given: 유효한 JWT 토큰
+     * When: GET /api/auth/me 호출
+     * Then: 200 OK + 사용자 정보 반환
      */
     @Test
-    fun `should return user info when valid JWT token is provided`() {
+    @DisplayName("testGetUserInfo - 유효한 JWT 토큰으로 사용자 정보를 조회한다")
+    fun testGetUserInfo() {
         // Given: 테스트용 사용자 생성
         val user = userRepository.save(
             User(
@@ -86,13 +86,13 @@ class AuthControllerTest {
     /**
      * T034: 잘못된 JWT 토큰으로 401 오류
      *
-     * 시나리오:
-     * 1. 잘못된 JWT 토큰 생성
-     * 2. Authorization 헤더에 잘못된 토큰 포함하여 GET /api/auth/me 호출
-     * 3. 401 Unauthorized 응답 확인
+     * Given: 잘못된 JWT 토큰
+     * When: GET /api/auth/me 호출
+     * Then: 401 Unauthorized 응답
      */
     @Test
-    fun `should return 401 when invalid JWT token is provided`() {
+    @DisplayName("testGetUserInfoInvalidToken - 잘못된 JWT 토큰 사용 시 401 오류를 반환한다")
+    fun testGetUserInfoInvalidToken() {
         // Given: 잘못된 JWT 토큰
         val invalidToken = "invalid.jwt.token"
 
@@ -108,12 +108,13 @@ class AuthControllerTest {
     /**
      * T034: Authorization 헤더 없이 401 오류
      *
-     * 시나리오:
-     * 1. Authorization 헤더 없이 GET /api/auth/me 호출
-     * 2. 401 Unauthorized 응답 확인
+     * Given: Authorization 헤더 없음
+     * When: GET /api/auth/me 호출
+     * Then: 401 Unauthorized 응답
      */
     @Test
-    fun `should return 401 when Authorization header is missing`() {
+    @DisplayName("testGetUserInfoNoAuth - Authorization 헤더 없이 호출 시 401 오류를 반환한다")
+    fun testGetUserInfoNoAuth() {
         // When: GET /api/auth/me without Authorization header
         mockMvc.perform(get("/api/auth/me"))
             // Then: 401 Unauthorized (Spring Security 표준 응답)
@@ -123,13 +124,13 @@ class AuthControllerTest {
     /**
      * T034: 존재하지 않는 사용자 ID로 404 오류
      *
-     * 시나리오:
-     * 1. 존재하지 않는 사용자 ID로 JWT 토큰 생성
-     * 2. Authorization 헤더에 토큰 포함하여 GET /api/auth/me 호출
-     * 3. 404 Not Found 응답 확인
+     * Given: 존재하지 않는 사용자 ID의 JWT 토큰
+     * When: GET /api/auth/me 호출
+     * Then: 404 Not Found 응답
      */
     @Test
-    fun `should return 404 when user does not exist`() {
+    @DisplayName("testGetUserInfoNotFound - 존재하지 않는 사용자 조회 시 404 오류를 반환한다")
+    fun testGetUserInfoNotFound() {
         // Given: 존재하지 않는 사용자 ID로 JWT 토큰 생성
         val nonExistentUserId = 99999L
         val accessToken = jwtTokenService.generateAccessToken(
@@ -149,16 +150,17 @@ class AuthControllerTest {
     }
 
     /**
-     * T032: 로그아웃 성공 (204 No Content)
+     * T032: 로그아웃 성공
      *
-     * 시나리오:
-     * 1. POST /api/auth/logout 호출
-     * 2. 204 No Content 응답 확인
+     * Given: 로그아웃 요청
+     * When: POST /api/auth/logout 호출
+     * Then: 204 No Content 응답
      *
-     * 참고: Stateless JWT 방식이므로 서버 측에서는 특별한 처리 없음
+     * 참고: Stateless JWT 방식이므로 서버 측 특별 처리 없음
      */
     @Test
-    fun `should return 204 when logout is successful`() {
+    @DisplayName("testLogout - 로그아웃 시 204 No Content를 반환한다")
+    fun testLogout() {
         // When: POST /api/auth/logout
         mockMvc.perform(post("/api/auth/logout"))
             // Then: 204 No Content
@@ -168,14 +170,13 @@ class AuthControllerTest {
     /**
      * T033: OAuth 플로우 통합 테스트
      *
-     * OAuth2SuccessHandler가 올바르게 동작하는지 확인:
-     * 1. 새 사용자 생성
-     * 2. JWT 토큰 발급
-     * 3. 발급된 토큰으로 /api/auth/me 호출
-     * 4. 사용자 정보 반환 확인
+     * Given: OAuth2로 새 사용자 생성
+     * When: 발급된 JWT 토큰으로 /api/auth/me 호출
+     * Then: 200 OK + 사용자 정보 반환
      */
     @Test
-    fun `should create user and issue JWT token after OAuth success`() {
+    @DisplayName("testOAuthFlow - OAuth 인증 후 JWT 토큰 발급 및 사용자 정보 조회가 정상 동작한다")
+    fun testOAuthFlow() {
         // Given: OAuth2 인증으로 새 사용자 생성 (OAuth2SuccessHandler 시뮬레이션)
         val email = "oauth.user@example.com"
         val name = "OAuth 사용자"
@@ -211,13 +212,13 @@ class AuthControllerTest {
     /**
      * T034: JWT 토큰에서 사용자 정보 추출 테스트
      *
-     * JwtTokenService가 올바르게 동작하는지 확인:
-     * 1. 액세스 토큰 생성
-     * 2. 토큰에서 사용자 ID 추출
-     * 3. 토큰 유효성 검증
+     * Given: 생성된 JWT 액세스 토큰
+     * When: 토큰에서 사용자 정보 추출
+     * Then: 사용자 ID, 이메일 정보 일치 + 토큰 유효성 확인
      */
     @Test
-    fun `should extract user info from JWT token`() {
+    @DisplayName("testExtractUserFromToken - JWT 토큰에서 사용자 정보를 정확히 추출한다")
+    fun testExtractUserFromToken() {
         // Given: 테스트용 사용자
         val userId = 12345L
         val email = "jwt.test@example.com"

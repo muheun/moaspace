@@ -9,6 +9,7 @@ import me.muheun.moaspace.repository.PostEmbeddingRepository
 import me.muheun.moaspace.repository.PostRepository
 import me.muheun.moaspace.repository.UserRepository
 import me.muheun.moaspace.service.JwtTokenService
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -61,14 +62,13 @@ class PostControllerTest {
     /**
      * T047: 게시글 생성 및 자동 벡터화 테스트
      *
-     * 시나리오:
-     * 1. 테스트용 사용자 생성 및 JWT 토큰 발급
-     * 2. POST /api/posts로 게시글 생성 요청
-     * 3. 201 Created 응답 확인
-     * 4. PostEmbedding이 자동 생성되었는지 확인
+     * Given: 인증된 사용자
+     * When: POST /api/posts로 게시글 생성 요청
+     * Then: 201 Created 응답 + PostEmbedding 자동 생성
      */
     @Test
-    fun `should create post with automatic vectorization`() {
+    @DisplayName("testCreatePost - 게시글을 생성하고 자동으로 벡터화한다")
+    fun testCreatePost() {
         // Given: 테스트용 사용자 생성
         val user = userRepository.save(
             User(
@@ -125,13 +125,13 @@ class PostControllerTest {
     /**
      * T048: 게시글 조회 테스트
      *
-     * 시나리오:
-     * 1. 테스트용 게시글 생성
-     * 2. GET /api/posts/{id}로 조회 요청
-     * 3. 200 OK 응답 및 게시글 정보 확인
+     * Given: 저장된 게시글
+     * When: GET /api/posts/{id}로 조회 요청
+     * Then: 200 OK 응답 및 게시글 정보 확인
      */
     @Test
-    fun `should get post by id`() {
+    @DisplayName("testGetPostById - ID로 게시글을 조회한다")
+    fun testGetPostById() {
         // Given: 테스트용 사용자 및 게시글 생성
         val user = userRepository.save(
             User(
@@ -173,14 +173,13 @@ class PostControllerTest {
     /**
      * T049: 게시글 수정 및 벡터 재생성 테스트
      *
-     * 시나리오:
-     * 1. 테스트용 게시글 생성 및 초기 벡터화
-     * 2. PUT /api/posts/{id}로 수정 요청
-     * 3. 200 OK 응답 확인
-     * 4. PostEmbedding이 재생성되었는지 확인 (새로운 embedding)
+     * Given: 저장된 게시글 및 벡터
+     * When: PUT /api/posts/{id}로 수정 요청
+     * Then: 200 OK 응답 + PostEmbedding 재생성
      */
     @Test
-    fun `should update post and regenerate vector`() {
+    @DisplayName("testUpdatePost - 게시글을 수정하고 벡터를 재생성한다")
+    fun testUpdatePost() {
         // Given: 테스트용 사용자 및 게시글 생성
         val user = userRepository.save(
             User(
@@ -236,15 +235,15 @@ class PostControllerTest {
     }
 
     /**
-     * T049: 소유권 검증 테스트 (작성자가 아닌 사용자가 수정 시도)
+     * T049: 소유권 검증 테스트
      *
-     * 시나리오:
-     * 1. 작성자 A가 게시글 생성
-     * 2. 사용자 B가 게시글 수정 시도
-     * 3. 403 Forbidden 응답 확인
+     * Given: 작성자 A의 게시글
+     * When: 사용자 B가 수정 시도
+     * Then: 403 Forbidden 응답
      */
     @Test
-    fun `should return 403 when non-owner tries to update post`() {
+    @DisplayName("testUpdatePostForbidden - 작성자가 아닌 경우 수정 시 403 오류를 반환한다")
+    fun testUpdatePostForbidden() {
         // Given: 작성자 A 및 게시글 생성
         val authorA = userRepository.save(
             User(
@@ -303,12 +302,13 @@ class PostControllerTest {
     /**
      * T047: 인증 없이 게시글 생성 시도
      *
-     * 시나리오:
-     * 1. Authorization 헤더 없이 POST /api/posts 호출
-     * 2. 401 Unauthorized 응답 확인
+     * Given: Authorization 헤더 없음
+     * When: POST /api/posts 호출
+     * Then: 401 Unauthorized 응답
      */
     @Test
-    fun `should return 401 when creating post without authentication`() {
+    @DisplayName("testCreatePostUnauthorized - 인증 없이 게시글 생성 시 401 오류를 반환한다")
+    fun testCreatePostUnauthorized() {
         // Given: 게시글 생성 요청
         val createRequest = CreatePostRequest(
             title = "인증 없는 게시글",
@@ -331,12 +331,13 @@ class PostControllerTest {
     /**
      * T048: 존재하지 않는 게시글 조회
      *
-     * 시나리오:
-     * 1. 존재하지 않는 게시글 ID로 GET /api/posts/{id} 호출
-     * 2. 404 Not Found 응답 확인
+     * Given: 존재하지 않는 게시글 ID
+     * When: GET /api/posts/{id} 호출
+     * Then: 404 Not Found 응답
      */
     @Test
-    fun `should return 404 when post does not exist`() {
+    @DisplayName("testGetPostNotFound - 존재하지 않는 게시글 조회 시 404 오류를 반환한다")
+    fun testGetPostNotFound() {
         // Given: 테스트용 사용자
         val user = userRepository.save(
             User(
@@ -364,13 +365,13 @@ class PostControllerTest {
     /**
      * T048: 삭제된 게시글 조회 시도
      *
-     * 시나리오:
-     * 1. 게시글 생성 후 소프트 삭제 (deleted=true)
-     * 2. GET /api/posts/{id} 호출
-     * 3. 404 Not Found 응답 확인 (삭제된 글은 조회 불가)
+     * Given: 소프트 삭제된 게시글 (deleted=true)
+     * When: GET /api/posts/{id} 호출
+     * Then: 404 Not Found 응답
      */
     @Test
-    fun `should return 404 when accessing deleted post`() {
+    @DisplayName("testGetDeletedPost - 삭제된 게시글 조회 시 404 오류를 반환한다")
+    fun testGetDeletedPost() {
         // Given: 테스트용 사용자 및 삭제된 게시글
         val user = userRepository.save(
             User(
@@ -407,17 +408,15 @@ class PostControllerTest {
     }
 
     /**
-     * T065: 페이지네이션 테스트 (다양한 페이지 크기)
+     * T065: 페이지네이션 테스트
      *
-     * 시나리오:
-     * 1. 30개의 게시글 생성
-     * 2. page=0, size=10으로 조회 → 10개 반환
-     * 3. page=1, size=10으로 조회 → 10개 반환
-     * 4. page=2, size=10으로 조회 → 10개 반환
-     * 5. totalElements=30, totalPages=3 확인
+     * Given: 30개의 게시글
+     * When: page=0~2, size=10으로 조회
+     * Then: 각 페이지당 10개 반환, totalElements=30, totalPages=3
      */
     @Test
-    fun `should return paginated posts with correct pagination info`() {
+    @DisplayName("testGetPostsPaginated - 게시글 목록을 페이지네이션하여 반환한다")
+    fun testGetPostsPaginated() {
         // Given: 30개의 게시글 생성
         val user = userRepository.save(
             User(
@@ -484,15 +483,13 @@ class PostControllerTest {
     /**
      * T066: 해시태그 필터링 테스트
      *
-     * 시나리오:
-     * 1. #AI 태그 게시글 5개 생성
-     * 2. #Backend 태그 게시글 3개 생성
-     * 3. GET /api/posts?hashtag=AI → 5개 반환
-     * 4. GET /api/posts?hashtag=Backend → 3개 반환
-     * 5. GET /api/posts (필터 없음) → 8개 반환
+     * Given: #AI 태그 5개, #Backend 태그 3개
+     * When: hashtag 파라미터로 조회
+     * Then: 해당 태그 게시글만 반환
      */
     @Test
-    fun `should filter posts by hashtag`() {
+    @DisplayName("testFilterPostsByHashtag - 해시태그로 게시글을 필터링한다")
+    fun testFilterPostsByHashtag() {
         // Given: 다양한 해시태그 게시글 생성
         val user = userRepository.save(
             User(
@@ -565,18 +562,15 @@ class PostControllerTest {
     }
 
     /**
-     * T067: 벡터 검색 정확도 테스트 (임계값 필터링)
+     * T067: 벡터 검색 정확도 테스트
      *
-     * 시나리오:
-     * 1. "인공지능 기술의 발전" 게시글 생성
-     * 2. "머신러닝과 딥러닝" 게시글 생성
-     * 3. "요리 레시피" 게시글 생성
-     * 4. POST /api/posts/search { query: "AI와 머신러닝", threshold: 0.6 }
-     * 5. 유사한 게시글 (1, 2)만 반환, 무관한 게시글 (3) 제외
-     * 6. 유사도 점수 포함 확인
+     * Given: AI 관련 게시글 2개, 무관한 게시글 1개
+     * When: "AI와 머신러닝" 검색 (threshold=0.6)
+     * Then: 관련 게시글만 반환 + 유사도 점수 포함
      */
     @Test
-    fun `should return similar posts with threshold filtering and similarity scores`() {
+    @DisplayName("testSearchPostsWithThreshold - 임계값 기반 벡터 검색으로 유사 게시글을 찾는다")
+    fun testSearchPostsWithThreshold() {
         // Given: 다양한 주제의 게시글 생성 (HTTP API 사용하여 벡터화 자동 처리)
         val user = userRepository.save(
             User(
@@ -659,14 +653,13 @@ class PostControllerTest {
     /**
      * T079: 소프트 삭제 기능 테스트
      *
-     * 시나리오:
-     * 1. 작성자가 게시글 생성
-     * 2. DELETE /api/posts/{id}로 삭제 요청
-     * 3. 204 No Content 응답 확인
-     * 4. DB에서 deleted=true 확인
+     * Given: 작성자의 게시글
+     * When: DELETE /api/posts/{id} 호출
+     * Then: 204 No Content + DB에서 deleted=true
      */
     @Test
-    fun `should soft delete post successfully`() {
+    @DisplayName("testDeletePost - 게시글을 소프트 삭제한다")
+    fun testDeletePost() {
         // Given: 테스트용 사용자 및 게시글 생성
         val user = userRepository.save(
             User(
@@ -703,16 +696,15 @@ class PostControllerTest {
     }
 
     /**
-     * T080: 소유자가 아닌 경우 삭제 권한 실패 테스트
+     * T080: 삭제 권한 실패 테스트
      *
-     * 시나리오:
-     * 1. 작성자 A가 게시글 생성
-     * 2. 사용자 B가 DELETE /api/posts/{id} 시도
-     * 3. 403 Forbidden 응답 확인
-     * 4. 게시글이 삭제되지 않았는지 확인
+     * Given: 작성자 A의 게시글
+     * When: 사용자 B가 삭제 시도
+     * Then: 403 Forbidden + 게시글 유지
      */
     @Test
-    fun `should return 403 when non-owner tries to delete post`() {
+    @DisplayName("testDeletePostForbidden - 작성자가 아닌 경우 삭제 시 403 오류를 반환한다")
+    fun testDeletePostForbidden() {
         // Given: 작성자 A 및 게시글 생성
         val authorA = userRepository.save(
             User(
@@ -760,17 +752,15 @@ class PostControllerTest {
     }
 
     /**
-     * T081: 삭제된 게시글이 목록 API에서 제외되는지 테스트
+     * T081: 삭제된 게시글 목록 제외 테스트
      *
-     * 시나리오:
-     * 1. 게시글 5개 생성
-     * 2. 그 중 2개 소프트 삭제 (deleted=true)
-     * 3. GET /api/posts 호출
-     * 4. 삭제되지 않은 3개만 반환되는지 확인
-     * 5. totalElements=3 확인
+     * Given: 게시글 5개 (2개 삭제됨)
+     * When: GET /api/posts 호출
+     * Then: 삭제되지 않은 3개만 반환
      */
     @Test
-    fun `should exclude deleted posts from list API`() {
+    @DisplayName("testGetPostsExcludeDeleted - 목록 조회 시 삭제된 게시글을 제외한다")
+    fun testGetPostsExcludeDeleted() {
         // Given: 5개의 게시글 생성
         val user = userRepository.save(
             User(
