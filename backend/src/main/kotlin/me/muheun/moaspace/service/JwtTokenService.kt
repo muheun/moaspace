@@ -127,4 +127,13 @@ class JwtTokenService(
             null
         }
     }
+
+    /**
+     * SecretKey 바이트 배열 반환
+     * SecurityConfig의 NimbusJwtDecoder와 동일한 키 공유
+     * @return SecretKey 바이트 배열
+     */
+    fun getSecretKeyBytes(): ByteArray {
+        return jwtSecret.toByteArray(StandardCharsets.UTF_8)
+    }
 }

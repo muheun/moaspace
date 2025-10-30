@@ -13,7 +13,7 @@ private val logger = LoggerFactory.getLogger(PostVectorService::class.java)
 /**
  * 게시글 벡터화 서비스
  *
- * Post의 plainContent를 768차원 벡터로 변환하여 PostEmbedding으로 저장합니다.
+ * Post의 contentText를 768차원 벡터로 변환하여 PostEmbedding으로 저장합니다.
  * Constitution Principle II: 필드별 벡터화 지원
  * Constitution Principle III: 임계값 필터링 지원
  */
@@ -24,7 +24,7 @@ class PostVectorService(
 ) {
 
     /**
-     * 게시글의 plainContent를 벡터화하여 PostEmbedding 생성
+     * 게시글의 contentText를 벡터화하여 PostEmbedding 생성
      *
      * @param post 벡터화할 게시글
      * @return 생성된 PostEmbedding
@@ -32,12 +32,12 @@ class PostVectorService(
     @Transactional
     fun vectorizePost(post: Post): PostEmbedding {
         require(post.id != null) { "Post ID가 null입니다. Post를 먼저 저장해야 합니다." }
-        require(post.plainContent.isNotBlank()) { "plainContent가 비어있습니다." }
+        require(post.contentText.isNotBlank()) { "contentText가 비어있습니다." }
 
-        logger.info("게시글 벡터화 시작: postId=${post.id}, plainContent 길이=${post.plainContent.length}")
+        logger.info("게시글 벡터화 시작: postId=${post.id}, contentText 길이=${post.contentText.length}")
 
         val embedding: PGvector = try {
-            onnxEmbeddingService.generateEmbedding(post.plainContent)
+            onnxEmbeddingService.generateEmbedding(post.contentText)
         } catch (e: Exception) {
             logger.error("벡터 생성 실패: postId=${post.id}, error=${e.message}", e)
             throw RuntimeException("게시글 벡터화 실패: ${e.message}", e)

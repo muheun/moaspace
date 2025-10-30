@@ -5,11 +5,16 @@ import java.time.LocalDateTime
 
 /**
  * 게시글 응답 DTO
+ *
+ * Frontend로 전달하는 데이터:
+ * - contentMarkdown: 에디터 편집용 (Markdown 원본)
+ * - contentHtml: 화면 표시용 (HTML 렌더링)
  */
 data class PostResponse(
     val id: Long,
     val title: String,
-    val content: String,
+    val contentMarkdown: String,
+    val contentHtml: String,
     val author: AuthorInfo,
     val hashtags: List<String>,
     val createdAt: LocalDateTime,
@@ -20,7 +25,8 @@ data class PostResponse(
             return PostResponse(
                 id = post.id!!,
                 title = post.title,
-                content = post.content,
+                contentMarkdown = post.contentMarkdown,
+                contentHtml = post.contentHtml,
                 author = AuthorInfo(
                     id = post.author.id!!,
                     name = post.author.name,

@@ -37,6 +37,7 @@ dependencies {
     // Spring Security + OAuth2 (User Story 1)
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server") // JWT Resource Server 지원
 
     // JWT (JSON Web Token)
     implementation("io.jsonwebtoken:jjwt-api:0.12.3")
@@ -63,6 +64,9 @@ dependencies {
 
     // Markdown 처리
     implementation("com.vladsch.flexmark:flexmark-all:0.64.8")
+
+    // HTML Sanitizer (XSS 방어)
+    implementation("com.googlecode.owasp-java-html-sanitizer:owasp-java-html-sanitizer:20220608.1")
 
     // OpenAI 토크나이저 제거 - 문자 기반 청킹으로 변경 (레퍼런스 프로젝트 참조)
     // implementation("com.knuddels:jtokkit:1.0.0")

@@ -1,11 +1,12 @@
 package me.muheun.moaspace.controller
 
 import me.muheun.moaspace.dto.UserResponse
-import me.muheun.moaspace.service.JwtTokenService
 import me.muheun.moaspace.service.UserService
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.*
 
 /**
@@ -14,16 +15,20 @@ import org.springframework.web.bind.annotation.*
  * T032: POST /api/auth/logout 엔드포인트 구현
  *
  * 주요 엔드포인트:
- * - GET /api/auth/me: 현재 로그인한 사용자 정보 조회 (JWT 기반)
+ * - GET /api/auth/me: 현재 로그인한 사용자 정보 조회 (JWT 기반, Spring Security Filter Chain 자동 검증)
  * - POST /api/auth/logout: 로그아웃 (클라이언트 측 토큰 삭제)
+ *
+ * Spring Security OAuth2 Resource Server 표준 방식:
+ * - Filter Chain에서 JWT 자동 검증 (NimbusJwtDecoder)
+ * - @AuthenticationPrincipal로 SecurityContext에서 인증 정보 주입
+ * - 컨트롤러 레벨의 수동 JWT 검증 제거
  *
  * Constitution Principle IX: UserResponse는 frontend/types/api/user.ts와 수동 동기화
  */
 @RestController
 @RequestMapping("/api/auth")
 class AuthController(
-    private val userService: UserService,
-    private val jwtTokenService: JwtTokenService
+    private val userService: UserService
 ) {
 
     private val logger = LoggerFactory.getLogger(AuthController::class.java)
@@ -32,36 +37,21 @@ class AuthController(
      * 현재 로그인한 사용자 정보 조회
      * T031: GET /api/auth/me 엔드포인트 구현
      *
-     * JWT 토큰에서 사용자 ID를 추출하여 사용자 정보를 반환합니다.
+     * Spring Security Filter Chain이 JWT 토큰을 자동으로 검증하고,
+     * @AuthenticationPrincipal을 통해 인증된 사용자 정보를 주입합니다.
+     *
      * 프론트엔드에서 헤더 표시 및 로그인 상태 확인에 사용됩니다.
      *
-     * @param authorization "Bearer {token}" 형식의 JWT 토큰
+     * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
      * @return UserResponse (사용자 정보)
      * @throws NoSuchElementException 사용자가 존재하지 않을 경우 (404)
-     * @throws IllegalArgumentException JWT 토큰이 없거나 형식이 잘못된 경우 (401)
      */
     @GetMapping("/me")
     fun getCurrentUser(
-        @RequestHeader("Authorization", required = false) authorization: String?
+        @AuthenticationPrincipal jwt: Jwt
     ): ResponseEntity<UserResponse> {
-        // Authorization 헤더 검증
-        if (authorization == null || !authorization.startsWith("Bearer ")) {
-            logger.warn("Authorization 헤더가 없거나 형식이 잘못되었습니다: $authorization")
-            throw IllegalArgumentException("인증이 필요합니다")
-        }
-
-        // JWT 토큰 추출
-        val token = jwtTokenService.extractToken(authorization)
-            ?: throw IllegalArgumentException("JWT 토큰 형식이 잘못되었습니다")
-
-        // 토큰 유효성 검증
-        if (!jwtTokenService.validateToken(token)) {
-            logger.warn("JWT 토큰이 유효하지 않습니다")
-            throw IllegalArgumentException("JWT 토큰이 유효하지 않습니다")
-        }
-
-        // 토큰에서 사용자 ID 추출
-        val userId = jwtTokenService.getUserIdFromToken(token)
+        // JWT Claims에서 사용자 ID 추출 (subject에 userId 저장됨)
+        val userId = jwt.subject.toLong()
 
         logger.info("현재 사용자 정보 조회: userId=$userId")
 
@@ -94,25 +84,11 @@ class AuthController(
     }
 
     /**
-     * 예외 처리: 인증 오류
-     */
-    @ExceptionHandler(IllegalArgumentException::class)
-    fun handleAuthenticationException(ex: IllegalArgumentException): ResponseEntity<Map<String, Any>> {
-        logger.error("인증 오류: ${ex.message}")
-
-        val errorResponse = mapOf(
-            "error" to mapOf(
-                "code" to "UNAUTHORIZED",
-                "message" to (ex.message ?: "인증이 필요합니다"),
-                "timestamp" to java.time.LocalDateTime.now()
-            )
-        )
-
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse)
-    }
-
-    /**
      * 예외 처리: 사용자 없음
+     *
+     * 인증 오류 (@ExceptionHandler(IllegalArgumentException::class))는 제거:
+     * - Spring Security Filter Chain이 자동으로 401 응답 처리
+     * - AuthenticationEntryPoint가 인증 실패 시 표준 응답 생성
      */
     @ExceptionHandler(NoSuchElementException::class)
     fun handleUserNotFoundException(ex: NoSuchElementException): ResponseEntity<Map<String, Any>> {

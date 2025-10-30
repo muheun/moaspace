@@ -1,14 +1,18 @@
 package me.muheun.moaspace.config
 
+import me.muheun.moaspace.service.JwtTokenService
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
+import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
+import javax.crypto.SecretKey
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * Spring Security 설정
@@ -18,19 +22,22 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
  *
  * 주요 기능:
  * - Google OAuth2 로그인 설정
- * - JWT 기반 인증 (Stateless)
+ * - JWT 기반 인증 (Stateless) - Spring Security Filter Chain 자동 검증
+ * - OAuth2 Resource Server (NimbusJwtDecoder)
  * - CORS 설정 (localhost:3000 허용)
  * - 공개 엔드포인트 허용 (인증 불필요)
  */
 @Configuration
 @EnableWebSecurity
 class SecurityConfig(
-    private val oauth2SuccessHandler: me.muheun.moaspace.security.OAuth2SuccessHandler
+    private val oauth2SuccessHandler: me.muheun.moaspace.security.OAuth2SuccessHandler,
+    private val jwtTokenService: JwtTokenService
 ) {
 
     /**
      * Security Filter Chain 설정
      * - OAuth2 로그인 활성화
+     * - OAuth2 Resource Server (JWT 자동 검증)
      * - JWT 기반 세션 비활성화 (Stateless)
      * - CORS 설정 적용
      */
@@ -48,6 +55,13 @@ class SecurityConfig(
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             }
 
+            // OAuth2 Resource Server 설정 (JWT 자동 검증)
+            .oauth2ResourceServer { oauth2 ->
+                oauth2.jwt { jwt ->
+                    jwt.decoder(jwtDecoder())
+                }
+            }
+
             // URL별 인증 설정
             .authorizeHttpRequests { auth ->
                 auth
@@ -56,12 +70,17 @@ class SecurityConfig(
                         "/",
                         "/error",
                         "/api/health",
-                        "/api/auth/**",
+                        "/api/auth/login",
+                        "/api/auth/logout",
                         "/login/**",
                         "/oauth2/**"
                     ).permitAll()
 
-                    // API 엔드포인트 (JWT 인증은 컨트롤러에서 처리)
+                    // 인증 필요 엔드포인트
+                    .requestMatchers("/api/auth/me").authenticated()
+                    .requestMatchers("/api/posts/**").authenticated()
+
+                    // API 엔드포인트 (기본 허용)
                     .requestMatchers("/api/**").permitAll()
 
                     // 나머지 모든 요청은 인증 필요
@@ -84,6 +103,47 @@ class SecurityConfig(
             }
 
         return http.build()
+    }
+
+    /**
+     * JWT Decoder 설정
+     * JwtTokenService의 jjwt 파서를 활용한 Custom JwtDecoder
+     *
+     * JwtTokenService는 jjwt (io.jsonwebtoken) 라이브러리로 토큰을 생성하므로,
+     * 동일한 라이브러리로 검증하는 Custom Decoder를 사용합니다.
+     *
+     * Nimbus JWT 대신 jjwt 파서를 사용하여 호환성을 보장합니다.
+     */
+    @Bean
+    fun jwtDecoder(): JwtDecoder {
+        return JwtDecoder { token ->
+            try {
+                // jjwt 라이브러리로 토큰 검증 및 파싱
+                val secretKeyBytes = jwtTokenService.getSecretKeyBytes()
+                val secretKey: SecretKey = SecretKeySpec(secretKeyBytes, "HmacSHA256")
+
+                val claims = io.jsonwebtoken.Jwts.parser()
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .payload
+
+                // Spring Security Jwt 객체로 변환
+                val headers = mutableMapOf<String, Any>("alg" to "HS256", "typ" to "JWT")
+                val claimsMap = claims.mapValues { it.value as Any }.toMutableMap()
+
+                org.springframework.security.oauth2.jwt.Jwt(
+                    token,
+                    claims.issuedAt.toInstant(),
+                    claims.expiration.toInstant(),
+                    headers,
+                    claimsMap
+                )
+            } catch (e: Exception) {
+                // JWT 파싱/검증 실패 시 BadCredentialsException으로 변환 (401 Unauthorized 응답)
+                throw org.springframework.security.oauth2.jwt.BadJwtException("Invalid JWT token: ${e.message}", e)
+            }
+        }
     }
 
     /**

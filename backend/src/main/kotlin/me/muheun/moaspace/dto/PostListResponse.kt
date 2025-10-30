@@ -43,10 +43,10 @@ data class PostSummary(
 ) {
     companion object {
         fun from(post: Post): PostSummary {
-            val excerpt = if (post.plainContent.length > 100) {
-                post.plainContent.substring(0, 100) + "..."
+            val excerpt = if (post.contentText.length > 100) {
+                post.contentText.substring(0, 100) + "..."
             } else {
-                post.plainContent
+                post.contentText
             }
 
             return PostSummary(

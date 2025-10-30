@@ -38,8 +38,9 @@ class PostRepositoryTest2 {
         val user = createAndSaveUser("post@example.com", "게시글 작성자")
         val post = Post(
             title = "테스트 게시글",
-            content = "<p>HTML 콘텐츠</p>",
-            plainContent = "HTML 콘텐츠", // Constitution Principle VIII
+            contentMarkdown = "HTML 콘텐츠",
+            contentHtml = "<p>HTML 콘텐츠</p>",
+            contentText = "HTML 콘텐츠", // Constitution Principle VIII
             author = user,
             hashtags = arrayOf("테스트", "게시판")
         )
@@ -50,8 +51,9 @@ class PostRepositoryTest2 {
         // Then
         assertNotNull(savedPost.id)
         assertEquals("테스트 게시글", savedPost.title)
-        assertEquals("<p>HTML 콘텐츠</p>", savedPost.content)
-        assertEquals("HTML 콘텐츠", savedPost.plainContent)
+        assertEquals("HTML 콘텐츠", savedPost.contentMarkdown)
+        assertEquals("<p>HTML 콘텐츠</p>", savedPost.contentHtml)
+        assertEquals("HTML 콘텐츠", savedPost.contentText)
         assertEquals(2, savedPost.hashtags.size)
         assertFalse(savedPost.deleted)
         assertNotNull(savedPost.createdAt)
@@ -99,15 +101,17 @@ class PostRepositoryTest2 {
         val user = createAndSaveUser("hashtag@example.com", "해시태그 사용자")
         val post1 = Post(
             title = "Kotlin 게시글",
-            content = "<p>Kotlin 내용</p>",
-            plainContent = "Kotlin 내용",
+            contentMarkdown = "Kotlin 내용",
+            contentHtml = "<p>Kotlin 내용</p>",
+            contentText = "Kotlin 내용",
             author = user,
             hashtags = arrayOf("Kotlin", "Backend")
         )
         val post2 = Post(
             title = "Java 게시글",
-            content = "<p>Java 내용</p>",
-            plainContent = "Java 내용",
+            contentMarkdown = "Java 내용",
+            contentHtml = "<p>Java 내용</p>",
+            contentText = "Java 내용",
             author = user,
             hashtags = arrayOf("Java", "Backend")
         )
@@ -115,12 +119,13 @@ class PostRepositoryTest2 {
         entityManager.persistAndFlush(post2)
 
         // When
-        val pageable = PageRequest.of(0, 10)
-        val kotlinPosts = postRepository.findByHashtagAndDeletedFalse("Kotlin", pageable)
+        val posts = postRepository.findByHashtag("Kotlin", limit = 10, offset = 0)
+        val total = postRepository.countByHashtag("Kotlin")
 
         // Then
-        assertEquals(1, kotlinPosts.totalElements)
-        assertEquals("Kotlin 게시글", kotlinPosts.content[0].title)
+        assertEquals(1, total)
+        assertEquals(1, posts.size)
+        assertEquals("Kotlin 게시글", posts[0].title)
     }
 
     @Test
@@ -149,14 +154,16 @@ class PostRepositoryTest2 {
         // When
         Thread.sleep(100) // 시간 차이를 두기 위해
         post.title = "수정된 제목"
-        post.content = "<p>수정된 내용</p>"
-        post.plainContent = "수정된 내용"
+        post.contentMarkdown = "수정된 내용"
+        post.contentHtml = "<p>수정된 내용</p>"
+        post.contentText = "수정된 내용"
         val updatedPost = entityManager.persistAndFlush(post)
 
         // Then
         assertEquals("수정된 제목", updatedPost.title)
-        assertEquals("<p>수정된 내용</p>", updatedPost.content)
-        assertEquals("수정된 내용", updatedPost.plainContent)
+        assertEquals("수정된 내용", updatedPost.contentMarkdown)
+        assertEquals("<p>수정된 내용</p>", updatedPost.contentHtml)
+        assertEquals("수정된 내용", updatedPost.contentText)
         assertTrue(updatedPost.updatedAt.isAfter(originalUpdatedAt))
     }
 
@@ -187,11 +194,12 @@ class PostRepositoryTest2 {
         return entityManager.persistAndFlush(user)
     }
 
-    private fun createAndSavePost(user: User, title: String, plainContent: String): Post {
+    private fun createAndSavePost(user: User, title: String, textContent: String): Post {
         val post = Post(
             title = title,
-            content = "<p>$plainContent</p>",
-            plainContent = plainContent,
+            contentMarkdown = textContent,
+            contentHtml = "<p>$textContent</p>",
+            contentText = textContent,
             author = user
         )
         return entityManager.persistAndFlush(post)

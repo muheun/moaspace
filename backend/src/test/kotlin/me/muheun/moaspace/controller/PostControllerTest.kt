@@ -82,8 +82,7 @@ class PostControllerTest {
 
         val createRequest = CreatePostRequest(
             title = "Next.js 15 + React 19 사용 후기",
-            content = "<p><strong>Next.js 15</strong>가 출시되었습니다.</p>",
-            plainContent = "Next.js 15가 출시되었습니다.",
+            contentMarkdown = "**Next.js 15**가 출시되었습니다.",
             hashtags = listOf("Next.js", "React", "웹개발")
         )
 
@@ -100,7 +99,8 @@ class PostControllerTest {
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.id").exists())
             .andExpect(jsonPath("$.title").value(createRequest.title))
-            .andExpect(jsonPath("$.content").value(createRequest.content))
+            .andExpect(jsonPath("$.contentMarkdown").value(createRequest.contentMarkdown))
+            .andExpect(jsonPath("$.contentHtml").exists())
             .andExpect(jsonPath("$.author.id").value(user.id!!))
             .andExpect(jsonPath("$.author.name").value(user.name))
             .andExpect(jsonPath("$.hashtags[0]").value("Next.js"))
@@ -144,8 +144,9 @@ class PostControllerTest {
         val post = postRepository.save(
             Post(
                 title = "테스트 게시글",
-                content = "<p>테스트 내용</p>",
-                plainContent = "테스트 내용",
+                contentMarkdown = "테스트 내용",
+                contentHtml = "<p>테스트 내용</p>",
+                contentText = "테스트 내용",
                 author = user,
                 hashtags = arrayOf("테스트")
             )
@@ -162,7 +163,8 @@ class PostControllerTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.id").value(post.id!!))
             .andExpect(jsonPath("$.title").value(post.title))
-            .andExpect(jsonPath("$.content").value(post.content))
+            .andExpect(jsonPath("$.contentMarkdown").value(post.contentMarkdown))
+            .andExpect(jsonPath("$.contentHtml").value(post.contentHtml))
             .andExpect(jsonPath("$.author.id").value(user.id!!))
             .andExpect(jsonPath("$.author.name").value(user.name))
             .andExpect(jsonPath("$.hashtags[0]").value("테스트"))
@@ -191,8 +193,9 @@ class PostControllerTest {
         val post = postRepository.save(
             Post(
                 title = "원본 제목",
-                content = "<p>원본 내용</p>",
-                plainContent = "원본 내용",
+                contentMarkdown = "원본 내용",
+                contentHtml = "<p>원본 내용</p>",
+                contentText = "원본 내용",
                 author = user,
                 hashtags = arrayOf("원본")
             )
@@ -202,8 +205,7 @@ class PostControllerTest {
 
         val updateRequest = UpdatePostRequest(
             title = "수정된 제목",
-            content = "<p>수정된 내용입니다.</p>",
-            plainContent = "수정된 내용입니다.",
+            contentMarkdown = "수정된 내용입니다.",
             hashtags = listOf("수정", "테스트")
         )
 
@@ -220,13 +222,14 @@ class PostControllerTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.id").value(post.id!!))
             .andExpect(jsonPath("$.title").value("수정된 제목"))
-            .andExpect(jsonPath("$.content").value("<p>수정된 내용입니다.</p>"))
+            .andExpect(jsonPath("$.contentMarkdown").value("수정된 내용입니다."))
+            .andExpect(jsonPath("$.contentHtml").exists())
             .andExpect(jsonPath("$.hashtags[0]").value("수정"))
             .andExpect(jsonPath("$.hashtags[1]").value("테스트"))
 
         val updatedPost = postRepository.findById(post.id!!).get()
         assert(updatedPost.title == "수정된 제목") { "제목이 수정되지 않았습니다" }
-        assert(updatedPost.plainContent == "수정된 내용입니다.") { "plainContent가 수정되지 않았습니다" }
+        assert(updatedPost.contentText == "수정된 내용입니다.") { "contentText가 수정되지 않았습니다" }
 
         val embedding = postEmbeddingRepository.findByPost(updatedPost)
         assert(embedding.isPresent) { "PostEmbedding이 재생성되지 않았습니다" }
@@ -254,8 +257,9 @@ class PostControllerTest {
         val post = postRepository.save(
             Post(
                 title = "A의 게시글",
-                content = "<p>A가 작성한 내용</p>",
-                plainContent = "A가 작성한 내용",
+                contentMarkdown = "A가 작성한 내용",
+                contentHtml = "<p>A가 작성한 내용</p>",
+                contentText = "A가 작성한 내용",
                 author = authorA,
                 hashtags = arrayOf("A")
             )
@@ -274,8 +278,7 @@ class PostControllerTest {
 
         val updateRequest = UpdatePostRequest(
             title = "B가 수정한 제목",
-            content = "<p>B가 수정한 내용</p>",
-            plainContent = "B가 수정한 내용",
+            contentMarkdown = "B가 수정한 내용",
             hashtags = listOf("B")
         )
 
@@ -309,8 +312,7 @@ class PostControllerTest {
         // Given: 게시글 생성 요청
         val createRequest = CreatePostRequest(
             title = "인증 없는 게시글",
-            content = "<p>내용</p>",
-            plainContent = "내용",
+            contentMarkdown = "내용",
             hashtags = emptyList()
         )
 
@@ -322,10 +324,8 @@ class PostControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestJson)
         )
-            // Then: 401 Unauthorized
+            // Then: 401 Unauthorized (Spring Security 표준 응답)
             .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.error.code").value("UNAUTHORIZED"))
-            .andExpect(jsonPath("$.error.message").value("인증이 필요합니다"))
     }
 
     /**
@@ -383,8 +383,9 @@ class PostControllerTest {
         val post = postRepository.save(
             Post(
                 title = "삭제될 게시글",
-                content = "<p>삭제될 내용</p>",
-                plainContent = "삭제될 내용",
+                contentMarkdown = "삭제될 내용",
+                contentHtml = "<p>삭제될 내용</p>",
+                contentText = "삭제될 내용",
                 author = user,
                 hashtags = arrayOf("삭제")
             )
@@ -430,8 +431,9 @@ class PostControllerTest {
             postRepository.save(
                 Post(
                     title = "게시글 ${index + 1}",
-                    content = "<p>내용 ${index + 1}</p>",
-                    plainContent = "내용 ${index + 1}",
+                    contentMarkdown = "내용 ${index + 1}",
+                    contentHtml = "<p>내용 ${index + 1}</p>",
+                    contentText = "내용 ${index + 1}",
                     author = user,
                     hashtags = arrayOf("테스트")
                 )
@@ -505,8 +507,9 @@ class PostControllerTest {
             postRepository.save(
                 Post(
                     title = "AI 게시글 ${index + 1}",
-                    content = "<p>AI 내용</p>",
-                    plainContent = "AI 내용",
+                    contentMarkdown = "AI 내용",
+                    contentHtml = "<p>AI 내용</p>",
+                    contentText = "AI 내용",
                     author = user,
                     hashtags = arrayOf("AI", "Tech")
                 )
@@ -518,8 +521,9 @@ class PostControllerTest {
             postRepository.save(
                 Post(
                     title = "Backend 게시글 ${index + 1}",
-                    content = "<p>Backend 내용</p>",
-                    plainContent = "Backend 내용",
+                    contentMarkdown = "Backend 내용",
+                    contentHtml = "<p>Backend 내용</p>",
+                    contentText = "Backend 내용",
                     author = user,
                     hashtags = arrayOf("Backend", "Server")
                 )
@@ -573,7 +577,7 @@ class PostControllerTest {
      */
     @Test
     fun `should return similar posts with threshold filtering and similarity scores`() {
-        // Given: 다양한 주제의 게시글 생성
+        // Given: 다양한 주제의 게시글 생성 (HTTP API 사용하여 벡터화 자동 처리)
         val user = userRepository.save(
             User(
                 email = "user@example.com",
@@ -582,41 +586,52 @@ class PostControllerTest {
             )
         )
 
-        val post1 = postRepository.save(
-            Post(
-                title = "인공지능 기술의 발전",
-                content = "<p>인공지능과 머신러닝 기술이 빠르게 발전하고 있습니다.</p>",
-                plainContent = "인공지능과 머신러닝 기술이 빠르게 발전하고 있습니다.",
-                author = user,
-                hashtags = arrayOf("AI", "ML")
-            )
-        )
-
-        val post2 = postRepository.save(
-            Post(
-                title = "머신러닝과 딥러닝",
-                content = "<p>머신러닝과 딥러닝은 AI의 핵심 기술입니다.</p>",
-                plainContent = "머신러닝과 딥러닝은 AI의 핵심 기술입니다.",
-                author = user,
-                hashtags = arrayOf("ML", "DL")
-            )
-        )
-
-        val post3 = postRepository.save(
-            Post(
-                title = "요리 레시피",
-                content = "<p>맛있는 파스타 만드는 법을 소개합니다.</p>",
-                plainContent = "맛있는 파스타 만드는 법을 소개합니다.",
-                author = user,
-                hashtags = arrayOf("요리", "레시피")
-            )
-        )
-
-        // 벡터화
-        postEmbeddingRepository.flush()
-        Thread.sleep(1000) // 벡터화 처리 대기
-
         val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
+
+        // Post 1: AI 관련
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "인공지능 기술의 발전",
+                        contentMarkdown = "인공지능과 머신러닝 기술이 빠르게 발전하고 있습니다.",
+                        hashtags = listOf("AI", "ML")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // Post 2: ML 관련
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "머신러닝과 딥러닝",
+                        contentMarkdown = "머신러닝과 딥러닝은 AI의 핵심 기술입니다.",
+                        hashtags = listOf("ML", "DL")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // Post 3: 무관한 주제
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "요리 레시피",
+                        contentMarkdown = "맛있는 파스타 만드는 법을 소개합니다.",
+                        hashtags = listOf("요리", "레시피")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // 벡터화 완료 대기 (비동기 처리)
+        Thread.sleep(2000)
 
         val searchRequest = """
             {
@@ -664,8 +679,9 @@ class PostControllerTest {
         val post = postRepository.save(
             Post(
                 title = "삭제될 게시글",
-                content = "<p>삭제될 내용</p>",
-                plainContent = "삭제될 내용",
+                contentMarkdown = "삭제될 내용",
+                contentHtml = "<p>삭제될 내용</p>",
+                contentText = "삭제될 내용",
                 author = user,
                 hashtags = arrayOf("삭제", "테스트")
             )
@@ -709,8 +725,9 @@ class PostControllerTest {
         val post = postRepository.save(
             Post(
                 title = "A의 게시글",
-                content = "<p>A가 작성한 내용</p>",
-                plainContent = "A가 작성한 내용",
+                contentMarkdown = "A가 작성한 내용",
+                contentHtml = "<p>A가 작성한 내용</p>",
+                contentText = "A가 작성한 내용",
                 author = authorA,
                 hashtags = arrayOf("A")
             )
@@ -768,8 +785,9 @@ class PostControllerTest {
             val post = postRepository.save(
                 Post(
                     title = "게시글 ${index + 1}",
-                    content = "<p>내용 ${index + 1}</p>",
-                    plainContent = "내용 ${index + 1}",
+                    contentMarkdown = "내용 ${index + 1}",
+                    contentHtml = "<p>내용 ${index + 1}</p>",
+                    contentText = "내용 ${index + 1}",
                     author = user,
                     hashtags = arrayOf("테스트")
                 )

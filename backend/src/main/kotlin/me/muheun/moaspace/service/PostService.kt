@@ -52,12 +52,28 @@ class PostService(
         val author = userRepository.findById(userId)
             .orElseThrow { NoSuchElementException("작성자를 찾을 수 없습니다: userId=$userId") }
 
+        // XSS 방어: Title sanitize
+        val sanitizedTitle = sanitizeTitle(request.title)
+
+        // XSS 방어: Hashtags sanitize
+        val sanitizedHashtags = request.hashtags.map { sanitizeHashtag(it) }.toTypedArray()
+
+        // Markdown → HTML 파싱
+        val contentHtml = parseMarkdown(request.contentMarkdown)
+
+        // HTML Sanitize (허용된 태그만)
+        val sanitizedHtml = sanitizeHtml(contentHtml)
+
+        // HTML → PlainText 추출 (벡터화용)
+        val contentText = extractPlainText(sanitizedHtml)
+
         val post = Post(
-            title = request.title,
-            content = request.content,
-            plainContent = request.plainContent,
+            title = sanitizedTitle,
+            contentMarkdown = request.contentMarkdown,
+            contentHtml = sanitizedHtml,
+            contentText = contentText,
             author = author,
-            hashtags = request.hashtags.toTypedArray()
+            hashtags = sanitizedHashtags
         )
 
         val savedPost = postRepository.save(post)
@@ -67,6 +83,60 @@ class PostService(
         logger.info("게시글 벡터화 완료: postId=${savedPost.id}")
 
         return savedPost
+    }
+
+    /**
+     * Title XSS 방어 - HTML 태그 제거
+     */
+    private fun sanitizeTitle(title: String): String {
+        return title.replace(Regex("<[^>]*>"), "").trim()
+    }
+
+    /**
+     * Hashtag XSS 방어 - HTML 태그 제거
+     */
+    private fun sanitizeHashtag(hashtag: String): String {
+        return hashtag.replace(Regex("<[^>]*>"), "").trim()
+    }
+
+    /**
+     * Markdown → HTML 파싱
+     */
+    private fun parseMarkdown(markdown: String): String {
+        val parser = com.vladsch.flexmark.parser.Parser.builder().build()
+        val renderer = com.vladsch.flexmark.html.HtmlRenderer.builder().build()
+        val document = parser.parse(markdown)
+        return renderer.render(document)
+    }
+
+    /**
+     * HTML Sanitize (XSS 방어)
+     */
+    private fun sanitizeHtml(html: String): String {
+        val policy = org.owasp.html.Sanitizers.FORMATTING
+            .and(org.owasp.html.Sanitizers.BLOCKS)
+            .and(org.owasp.html.Sanitizers.LINKS)
+            .and(org.owasp.html.Sanitizers.IMAGES)
+            .and(org.owasp.html.Sanitizers.TABLES)
+        return policy.sanitize(html)
+    }
+
+    /**
+     * HTML → 순수 텍스트 추출 (벡터화용)
+     */
+    private fun extractPlainText(html: String): String {
+        // HTML 태그 제거
+        val withoutTags = html.replace(Regex("<[^>]*>"), " ")
+        // HTML 엔티티 디코드
+        val decoded = withoutTags
+            .replace("&nbsp;", " ")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+        // 연속된 공백 제거
+        return decoded.replace(Regex("\\s+"), " ").trim()
     }
 
     /**
@@ -118,10 +188,26 @@ class PostService(
             throw IllegalArgumentException("게시글을 수정할 권한이 없습니다")
         }
 
-        post.title = request.title
-        post.content = request.content
-        post.plainContent = request.plainContent
-        post.hashtags = request.hashtags.toTypedArray()
+        // XSS 방어: Title sanitize
+        val sanitizedTitle = sanitizeTitle(request.title)
+
+        // XSS 방어: Hashtags sanitize
+        val sanitizedHashtags = request.hashtags.map { sanitizeHashtag(it) }.toTypedArray()
+
+        // Markdown → HTML 파싱
+        val contentHtml = parseMarkdown(request.contentMarkdown)
+
+        // HTML Sanitize
+        val sanitizedHtml = sanitizeHtml(contentHtml)
+
+        // HTML → PlainText 추출
+        val contentText = extractPlainText(sanitizedHtml)
+
+        post.title = sanitizedTitle
+        post.contentMarkdown = request.contentMarkdown
+        post.contentHtml = sanitizedHtml
+        post.contentText = contentText
+        post.hashtags = sanitizedHashtags
 
         val updatedPost = postRepository.save(post)
         logger.info("게시글 업데이트 완료: postId=$postId")
@@ -148,7 +234,15 @@ class PostService(
         return if (hashtag.isNullOrBlank()) {
             postRepository.findByDeletedFalse(pageable)
         } else {
-            postRepository.findByHashtagAndDeletedFalse(hashtag, pageable)
+            // Native Query는 Pageable의 Sort를 올바르게 처리하지 못하므로
+            // List와 Count를 분리해서 조회 후 수동으로 Page 생성
+            val content = postRepository.findByHashtag(
+                hashtag = hashtag,
+                limit = pageable.pageSize,
+                offset = pageable.offset
+            )
+            val total = postRepository.countByHashtag(hashtag)
+            org.springframework.data.domain.PageImpl(content, pageable, total)
         }
     }
 

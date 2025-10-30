@@ -2,7 +2,6 @@ package me.muheun.moaspace.controller
 
 import jakarta.validation.Valid
 import me.muheun.moaspace.dto.*
-import me.muheun.moaspace.service.JwtTokenService
 import me.muheun.moaspace.service.PostService
 import me.muheun.moaspace.service.PostVectorService
 import org.slf4j.LoggerFactory
@@ -10,6 +9,8 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.*
 import java.time.LocalDateTime
 
@@ -23,14 +24,18 @@ import java.time.LocalDateTime
  * - GET /api/posts/{id}: 게시글 조회 (JWT 인증 필요)
  * - PUT /api/posts/{id}: 게시글 수정 (JWT 인증 + 소유권 검증)
  *
+ * Spring Security OAuth2 Resource Server 표준 방식:
+ * - Filter Chain에서 JWT 자동 검증 (NimbusJwtDecoder)
+ * - @AuthenticationPrincipal로 SecurityContext에서 인증 정보 주입
+ * - 컨트롤러 레벨의 수동 JWT 검증 제거
+ *
  * Constitution Principle IX: PostResponse는 frontend/types/api/posts.ts와 수동 동기화
  */
 @RestController
 @RequestMapping("/api/posts")
 class PostController(
     private val postService: PostService,
-    private val postVectorService: PostVectorService,
-    private val jwtTokenService: JwtTokenService
+    private val postVectorService: PostVectorService
 ) {
 
     private val logger = LoggerFactory.getLogger(PostController::class.java)
@@ -39,21 +44,21 @@ class PostController(
      * 게시글 생성
      * T043: POST /api/posts 엔드포인트 구현
      *
-     * JWT 토큰에서 사용자 ID를 추출하여 게시글을 생성합니다.
+     * Spring Security Filter Chain이 JWT 토큰을 자동으로 검증하고,
+     * @AuthenticationPrincipal을 통해 인증된 사용자 정보를 주입합니다.
      * 생성 즉시 PostVectorService를 통해 자동 벡터화됩니다.
      *
-     * @param authorization "Bearer {token}" 형식의 JWT 토큰
+     * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
      * @param request 게시글 생성 요청 (title, content, plainContent, hashtags)
      * @return PostResponse (생성된 게시글 정보)
-     * @throws IllegalArgumentException JWT 토큰이 없거나 유효하지 않을 경우 (401)
      * @throws NoSuchElementException 작성자를 찾을 수 없을 경우 (404)
      */
     @PostMapping
     fun createPost(
-        @RequestHeader("Authorization", required = false) authorization: String?,
+        @AuthenticationPrincipal jwt: Jwt,
         @Valid @RequestBody request: CreatePostRequest
     ): ResponseEntity<PostResponse> {
-        val userId = extractUserIdFromToken(authorization)
+        val userId = jwt.subject.toLong()
 
         logger.info("게시글 생성 요청: userId=$userId, title=${request.title}")
 
@@ -72,22 +77,19 @@ class PostController(
      * 삭제되지 않은 게시글만 조회하며, 최신순으로 정렬됩니다.
      * 해시태그 파라미터가 제공되면 해당 해시태그를 포함하는 게시글만 반환합니다.
      *
+     * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
      * @param page 페이지 번호 (0-based, 기본값: 0)
      * @param size 페이지 크기 (기본값: 20, 최대: 100)
      * @param hashtag 해시태그 필터 (선택적)
-     * @param authorization JWT 토큰 (인증 확인용)
      * @return PostListResponse (게시글 목록 + 페이지네이션 정보)
-     * @throws IllegalArgumentException JWT 토큰이 없거나 유효하지 않을 경우 (401)
      */
     @GetMapping
     fun getAllPosts(
+        @AuthenticationPrincipal jwt: Jwt,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int,
-        @RequestParam(required = false) hashtag: String?,
-        @RequestHeader("Authorization", required = false) authorization: String?
+        @RequestParam(required = false) hashtag: String?
     ): ResponseEntity<PostListResponse> {
-        extractUserIdFromToken(authorization)
-
         val pageSize = minOf(size, 100)
         val pageable = PageRequest.of(page, pageSize, Sort.by(Sort.Direction.DESC, "createdAt"))
 
@@ -107,19 +109,16 @@ class PostController(
      *
      * 삭제되지 않은 게시글만 조회 가능합니다.
      *
+     * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
      * @param id 게시글 ID
-     * @param authorization JWT 토큰 (인증 확인용)
      * @return PostResponse (게시글 상세 정보)
-     * @throws IllegalArgumentException JWT 토큰이 없거나 유효하지 않을 경우 (401)
      * @throws NoSuchElementException 게시글을 찾을 수 없거나 삭제된 경우 (404)
      */
     @GetMapping("/{id}")
     fun getPostById(
-        @PathVariable id: Long,
-        @RequestHeader("Authorization", required = false) authorization: String?
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable id: Long
     ): ResponseEntity<PostResponse> {
-        extractUserIdFromToken(authorization)
-
         logger.info("게시글 조회 요청: postId=$id")
 
         val post = postService.getPostById(id)
@@ -135,21 +134,20 @@ class PostController(
      * 작성자 본인만 수정할 수 있습니다.
      * 수정 시 PostVectorService를 통해 벡터가 자동으로 재생성됩니다.
      *
+     * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
      * @param id 게시글 ID
-     * @param authorization "Bearer {token}" 형식의 JWT 토큰
      * @param request 게시글 수정 요청 (title, content, plainContent, hashtags)
      * @return PostResponse (수정된 게시글 정보)
-     * @throws IllegalArgumentException JWT 토큰이 없거나 유효하지 않을 경우 (401)
      * @throws IllegalArgumentException 소유권이 없을 경우 (403)
      * @throws NoSuchElementException 게시글을 찾을 수 없을 경우 (404)
      */
     @PutMapping("/{id}")
     fun updatePost(
+        @AuthenticationPrincipal jwt: Jwt,
         @PathVariable id: Long,
-        @RequestHeader("Authorization", required = false) authorization: String?,
         @Valid @RequestBody request: UpdatePostRequest
     ): ResponseEntity<PostResponse> {
-        val userId = extractUserIdFromToken(authorization)
+        val userId = jwt.subject.toLong()
 
         logger.info("게시글 수정 요청: postId=$id, userId=$userId")
 
@@ -168,19 +166,16 @@ class PostController(
      * 게시글의 plainContent를 벡터화하여 유사도 검색을 수행합니다.
      * Constitution Principle III: 임계값 이상의 결과만 반환
      *
+     * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
      * @param request 검색 요청 (query, threshold, limit)
-     * @param authorization JWT 토큰 (인증 확인용)
      * @return VectorSearchResponse (검색 결과 + 유사도 점수)
-     * @throws IllegalArgumentException JWT 토큰이 없거나 유효하지 않을 경우 (401)
      * @throws IllegalArgumentException threshold 또는 limit 값이 유효하지 않을 경우 (400)
      */
     @PostMapping("/search")
     fun searchPosts(
-        @Valid @RequestBody request: PostSearchRequest,
-        @RequestHeader("Authorization", required = false) authorization: String?
+        @AuthenticationPrincipal jwt: Jwt,
+        @Valid @RequestBody request: PostSearchRequest
     ): ResponseEntity<VectorSearchResponse> {
-        extractUserIdFromToken(authorization)
-
         logger.info("벡터 검색 요청: query=${request.query.take(50)}, threshold=${request.threshold}, limit=${request.limit}")
 
         val (postEmbeddings, similarities) = postVectorService.searchSimilarPostsWithScores(
@@ -203,19 +198,18 @@ class PostController(
      * 작성자 본인만 삭제할 수 있습니다.
      * 실제로 데이터를 삭제하지 않고 deleted=true로 설정합니다.
      *
+     * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
      * @param id 게시글 ID
-     * @param authorization "Bearer {token}" 형식의 JWT 토큰
      * @return 204 No Content (삭제 성공)
-     * @throws IllegalArgumentException JWT 토큰이 없거나 유효하지 않을 경우 (401)
      * @throws IllegalArgumentException 소유권이 없을 경우 (403)
      * @throws NoSuchElementException 게시글을 찾을 수 없을 경우 (404)
      */
     @DeleteMapping("/{id}")
     fun deletePost(
-        @PathVariable id: Long,
-        @RequestHeader("Authorization", required = false) authorization: String?
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable id: Long
     ): ResponseEntity<Void> {
-        val userId = extractUserIdFromToken(authorization)
+        val userId = jwt.subject.toLong()
 
         logger.info("게시글 삭제 요청: postId=$id, userId=$userId")
 
@@ -227,56 +221,31 @@ class PostController(
     }
 
     /**
-     * Authorization 헤더에서 JWT 토큰을 추출하고 사용자 ID 반환
+     * 예외 처리: 권한 오류 (403 Forbidden) 및 리소스 없음 (404 Not Found)
      *
-     * @param authorization "Bearer {token}" 형식
-     * @return 사용자 ID
-     * @throws IllegalArgumentException 토큰이 없거나 유효하지 않을 경우
-     */
-    private fun extractUserIdFromToken(authorization: String?): Long {
-        if (authorization == null || !authorization.startsWith("Bearer ")) {
-            logger.warn("Authorization 헤더가 없거나 형식이 잘못되었습니다: $authorization")
-            throw IllegalArgumentException("인증이 필요합니다")
-        }
-
-        val token = jwtTokenService.extractToken(authorization)
-            ?: throw IllegalArgumentException("JWT 토큰 형식이 잘못되었습니다")
-
-        if (!jwtTokenService.validateToken(token)) {
-            logger.warn("JWT 토큰이 유효하지 않습니다")
-            throw IllegalArgumentException("JWT 토큰이 유효하지 않습니다")
-        }
-
-        return jwtTokenService.getUserIdFromToken(token)
-    }
-
-    /**
-     * 예외 처리: 인증 오류 (401 Unauthorized)
+     * 인증 오류 (@ExceptionHandler(IllegalArgumentException::class) - 401)는 제거:
+     * - Spring Security Filter Chain이 자동으로 401 응답 처리
+     * - AuthenticationEntryPoint가 인증 실패 시 표준 응답 생성
+     *
+     * 권한 오류 (403 Forbidden)와 리소스 없음 (404 Not Found)는 비즈니스 로직에서 발생하므로 유지:
+     * - 소유권 검증 실패: 403 Forbidden
+     * - 게시글 또는 사용자 없음: 404 Not Found
      */
     @ExceptionHandler(IllegalArgumentException::class)
-    fun handleAuthenticationException(ex: IllegalArgumentException): ResponseEntity<Map<String, Any>> {
-        logger.error("인증 또는 권한 오류: ${ex.message}")
+    fun handleBusinessException(ex: IllegalArgumentException): ResponseEntity<Map<String, Any>> {
+        logger.error("비즈니스 로직 오류: ${ex.message}")
 
         val errorResponse = mapOf(
             "error" to mapOf(
-                "code" to if (ex.message?.contains("권한") == true) "FORBIDDEN" else "UNAUTHORIZED",
-                "message" to (ex.message ?: "인증이 필요합니다"),
+                "code" to "FORBIDDEN",
+                "message" to (ex.message ?: "권한이 없습니다"),
                 "timestamp" to LocalDateTime.now()
             )
         )
 
-        val status = if (ex.message?.contains("권한") == true) {
-            HttpStatus.FORBIDDEN
-        } else {
-            HttpStatus.UNAUTHORIZED
-        }
-
-        return ResponseEntity.status(status).body(errorResponse)
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse)
     }
 
-    /**
-     * 예외 처리: 게시글 없음 (404 Not Found)
-     */
     @ExceptionHandler(NoSuchElementException::class)
     fun handlePostNotFoundException(ex: NoSuchElementException): ResponseEntity<Map<String, Any>> {
         logger.error("리소스 없음: ${ex.message}")

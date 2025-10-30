@@ -32,29 +32,38 @@ interface PostRepository : JpaRepository<Post, Long> {
     fun findByAuthorAndDeletedFalse(author: User, pageable: Pageable): Page<Post>
 
     /**
-     * 해시태그로 게시글 검색 (삭제되지 않은 글만)
-     * PostgreSQL 배열 연산자 사용을 위해 native query 필요
-     * @param hashtag 검색할 해시태그
-     * @param pageable 페이지 정보
-     * @return 게시글 페이지
+     * 해시태그로 게시글 수 조회 (카운트용)
      */
     @Query(
         value = """
-            SELECT * FROM posts p
-            WHERE :hashtag = ANY(p.hashtags)
-            AND p.deleted = false
-        """,
-        countQuery = """
             SELECT COUNT(*) FROM posts p
             WHERE :hashtag = ANY(p.hashtags)
             AND p.deleted = false
         """,
         nativeQuery = true
     )
-    fun findByHashtagAndDeletedFalse(
+    fun countByHashtag(@Param("hashtag") hashtag: String): Long
+
+    /**
+     * 해시태그로 게시글 검색 (페이지네이션)
+     * Native Query는 Pageable의 Sort를 올바르게 처리하지 못함
+     * (JPA 필드명 vs PostgreSQL 컬럼명 불일치)
+     */
+    @Query(
+        value = """
+            SELECT p.* FROM posts p
+            WHERE :hashtag = ANY(p.hashtags)
+            AND p.deleted = false
+            ORDER BY p.created_at DESC
+            LIMIT :limit OFFSET :offset
+        """,
+        nativeQuery = true
+    )
+    fun findByHashtag(
         @Param("hashtag") hashtag: String,
-        pageable: Pageable
-    ): Page<Post>
+        @Param("limit") limit: Int,
+        @Param("offset") offset: Long
+    ): List<Post>
 
     /**
      * 제목으로 게시글 검색 (삭제되지 않은 글만)
