@@ -2,12 +2,7 @@ package me.muheun.moaspace.service
 
 import org.springframework.stereotype.Service
 
-/**
- * 토큰 기반 텍스트 청킹 서비스
- *
- * 텍스트를 토큰 단위로 분석하여 검색에 최적화된 크기의 청크로 분할합니다.
- * 문장 단위로 분할하고 TARGET_TOKENS_PER_CHUNK를 기준으로 그룹화합니다.
- */
+// 토큰 기반 텍스트 청킹
 @Service
 class ChunkingService(
     private val tokenizerService: TokenizerService

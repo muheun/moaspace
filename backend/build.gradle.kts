@@ -13,6 +13,7 @@ plugins {
     kotlin("jvm") version "1.9.21"
     kotlin("plugin.spring") version "1.9.21"
     kotlin("plugin.jpa") version "1.9.21"
+    kotlin("kapt") version "1.9.21"  // QueryDSL Q클래스 자동 생성
     id("org.flywaydb.flyway") version "11.15.0"
 }
 
@@ -53,10 +54,17 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
-    // Kotlin JDSL 3.6.0 (타입 안전 쿼리 DSL)
+    // Kotlin JDSL 3.6.0 (타입 안전 쿼리 DSL) - QueryDSL 마이그레이션 후 제거 예정
     implementation("com.linecorp.kotlin-jdsl:jpql-dsl:3.6.0")
     implementation("com.linecorp.kotlin-jdsl:jpql-render:3.6.0")
     implementation("com.linecorp.kotlin-jdsl:spring-data-jpa-support:3.6.0")
+
+    // QueryDSL 5.x (타입 안전 쿼리 DSL - Q클래스 기반)
+    implementation("com.querydsl:querydsl-jpa:5.1.0:jakarta")
+    implementation("com.querydsl:querydsl-kotlin:5.1.0")
+    kapt("com.querydsl:querydsl-apt:5.1.0:jakarta")
+    kapt("jakarta.annotation:jakarta.annotation-api")
+    kapt("jakarta.persistence:jakarta.persistence-api")
 
     // MyBatis 3.0.3 (JPQL 미지원 쿼리: CTE, Window Function)
     implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3")

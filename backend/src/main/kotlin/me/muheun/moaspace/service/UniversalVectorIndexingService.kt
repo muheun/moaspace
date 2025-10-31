@@ -11,12 +11,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.concurrent.CompletableFuture
 
-/**
- * 범용 벡터 인덱싱 서비스
- *
- * namespace/entity/recordKey 패턴으로 다양한 엔티티의 벡터 인덱싱을 통합 관리합니다.
- * 동기 삭제와 비동기 벡터 생성을 조합하여 빠른 응답과 안정성을 보장합니다.
- */
+// 범용 벡터 인덱싱 서비스
 @Service
 class UniversalVectorIndexingService(
     private val vectorChunkRepository: VectorChunkRepository,
@@ -24,11 +19,7 @@ class UniversalVectorIndexingService(
     private val eventPublisher: ApplicationEventPublisher
 ) {
 
-    /**
-     * 새로운 엔티티를 벡터 인덱스에 추가
-     *
-     * 이벤트를 발행하고 즉시 반환하며, 백그라운드에서 벡터 생성이 진행됩니다.
-     */
+    // 엔티티 벡터 인덱싱
     fun indexEntity(request: VectorIndexRequest): CompletableFuture<Unit> {
         eventPublisher.publishEvent(
             VectorIndexingRequestedEvent(
@@ -43,11 +34,7 @@ class UniversalVectorIndexingService(
         return CompletableFuture.completedFuture(Unit)
     }
 
-    /**
-     * 기존 엔티티를 재인덱싱
-     *
-     * 기존 청크를 동기 삭제한 후 이벤트를 발행하여 고아 청크 발생을 방지합니다.
-     */
+    // 엔티티 재인덱싱
     @Transactional
     fun reindexEntity(request: VectorIndexRequest): CompletableFuture<Unit> {
         deleteEntity(request.namespace, request.entity, request.recordKey)
@@ -59,7 +46,8 @@ class UniversalVectorIndexingService(
      */
     @Transactional
     fun deleteEntity(namespace: String, entity: String, recordKey: String) {
-        vectorChunkRepository.deleteByNamespaceAndEntityAndRecordKey(namespace, entity, recordKey)
+        // MyBatis deleteByFilters() 사용 (fieldName=null → 모든 필드 삭제)
+        vectorChunkRepository.deleteByFilters(namespace, entity, recordKey, null)
     }
 
     /**

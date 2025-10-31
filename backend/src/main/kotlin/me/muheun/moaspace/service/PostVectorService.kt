@@ -10,25 +10,14 @@ import org.springframework.transaction.annotation.Transactional
 
 private val logger = LoggerFactory.getLogger(PostVectorService::class.java)
 
-/**
- * 게시글 벡터화 서비스
- *
- * Post의 contentText를 768차원 벡터로 변환하여 PostEmbedding으로 저장합니다.
- * Constitution Principle II: 필드별 벡터화 지원
- * Constitution Principle III: 임계값 필터링 지원
- */
+// 게시글 벡터화 서비스
 @Service
 class PostVectorService(
     private val onnxEmbeddingService: OnnxEmbeddingService,
     private val postEmbeddingRepository: PostEmbeddingRepository
 ) {
 
-    /**
-     * 게시글의 contentText를 벡터화하여 PostEmbedding 생성
-     *
-     * @param post 벡터화할 게시글
-     * @return 생성된 PostEmbedding
-     */
+    // 게시글 벡터 생성
     @Transactional
     fun vectorizePost(post: Post): PostEmbedding {
         require(post.id != null) { "Post ID가 null입니다. Post를 먼저 저장해야 합니다." }

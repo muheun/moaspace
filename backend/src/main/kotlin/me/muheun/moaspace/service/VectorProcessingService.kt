@@ -13,12 +13,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.sql.SQLException
 
-/**
- * 범용 벡터 처리 서비스
- *
- * VectorIndexingRequestedEvent를 수신하여 백그라운드에서 벡터 생성 및 청크 저장을 처리합니다.
- * Spring AOP 프록시를 위해 open 클래스로 선언합니다.
- */
+// 범용 벡터 처리 서비스
 @Service
 open class VectorProcessingService(
     private val vectorChunkRepository: VectorChunkRepository,

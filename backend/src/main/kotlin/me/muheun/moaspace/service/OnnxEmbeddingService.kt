@@ -12,12 +12,7 @@ import kotlin.math.sqrt
 
 private val logger = LoggerFactory.getLogger(OnnxEmbeddingService::class.java)
 
-/**
- * ONNX Runtime 기반 임베딩 서비스
- *
- * multilingual-e5-base 모델을 사용하여 텍스트를 768차원 벡터로 변환합니다.
- * 100개 언어를 지원하며, Mean Pooling과 L2 정규화를 통해 코사인 유사도 계산에 최적화된 벡터를 생성합니다.
- */
+// ONNX Runtime 임베딩 서비스
 @Service
 @Primary
 class OnnxEmbeddingService(

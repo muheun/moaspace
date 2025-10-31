@@ -1,6 +1,5 @@
 package me.muheun.moaspace.repository
 
-import com.linecorp.kotlinjdsl.support.spring.data.jpa.repository.KotlinJdslJpqlExecutor
 import me.muheun.moaspace.domain.VectorChunk
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
@@ -61,41 +60,21 @@ interface VectorChunkRepository :
         fieldName: String
     ): List<VectorChunk>
 
-    /**
-     * 특정 레코드의 모든 청크 삭제
+    /*
+     * ✅ DEPRECATED - MyBatis로 마이그레이션 완료
      *
-     * 재인덱싱 시 기존 청크를 삭제하는 용도로 사용됩니다.
+     * 아래 DELETE 메서드들은 VectorChunkCustomRepository.deleteByFilters()로 통합되었습니다:
+     * - deleteByNamespaceAndEntityAndRecordKey(namespace, entity, recordKey)
+     *   → deleteByFilters(namespace, entity, recordKey, null)
+     * - deleteByNamespaceAndEntityAndRecordKeyAndFieldName(namespace, entity, recordKey, fieldName)
+     *   → deleteByFilters(namespace, entity, recordKey, fieldName)
      *
-     * @param namespace 네임스페이스
-     * @param entity 엔티티 타입
-     * @param recordKey 레코드 ID
+     * MyBatis의 동적 <if> 구문으로 nullable fieldName 처리:
+     * - fieldName == null: 모든 필드 삭제
+     * - fieldName != null: 특정 필드만 삭제
+     *
+     * XML 위치: VectorChunkMapper.xml - deleteByFilters
      */
-    @Modifying
-    @Query("DELETE FROM VectorChunk v WHERE v.namespace = :namespace AND v.entity = :entity AND v.recordKey = :recordKey")
-    fun deleteByNamespaceAndEntityAndRecordKey(
-        @Param("namespace") namespace: String,
-        @Param("entity") entity: String,
-        @Param("recordKey") recordKey: String
-    )
-
-    /**
-     * 특정 레코드의 특정 필드 청크만 삭제
-     *
-     * 특정 필드만 재인덱싱할 때 사용됩니다.
-     *
-     * @param namespace 네임스페이스
-     * @param entity 엔티티 타입
-     * @param recordKey 레코드 ID
-     * @param fieldName 필드명
-     */
-    @Modifying
-    @Query("DELETE FROM VectorChunk v WHERE v.namespace = :namespace AND v.entity = :entity AND v.recordKey = :recordKey AND v.fieldName = :fieldName")
-    fun deleteByNamespaceAndEntityAndRecordKeyAndFieldName(
-        @Param("namespace") namespace: String,
-        @Param("entity") entity: String,
-        @Param("recordKey") recordKey: String,
-        @Param("fieldName") fieldName: String
-    )
 
     // ========================================
     // 벡터 유사도 검색 메서드 (MyBatis 마이그레이션 완료)

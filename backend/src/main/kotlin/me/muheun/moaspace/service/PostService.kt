@@ -11,18 +11,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-/**
- * 게시글 서비스
- * T042: 게시글 CRUD 작업을 위한 PostService 생성
- *
- * 주요 기능:
- * - 게시글 생성 (벡터화 자동 트리거)
- * - 게시글 조회 (삭제되지 않은 글만)
- * - 게시글 수정 (소유권 검증 + 벡터 재생성)
- *
- * Constitution Principle V: 실제 DB 연동 테스트 필요
- * Constitution Principle VIII: content (HTML) + plainContent (Plain Text) 분리 저장
- */
+// 게시글 서비스
 @Service
 @Transactional(readOnly = true)
 class PostService(
