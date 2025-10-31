@@ -242,4 +242,106 @@ class VectorConfigRepositoryTest {
         // then
         assertThat(allConfigs).hasSizeGreaterThanOrEqualTo(2)
     }
+
+    // ===========================
+    // Phase 4: QueryDSL 동적 필터링 테스트 (T042-T045)
+    // ===========================
+
+    /**
+     * T043: findByFilters - entityType 필터만 적용
+     *
+     * Given: Post(2개), Comment(1개) 설정 저장
+     * When: findByFilters(entityType="Post", fieldName=null, enabled=null) 호출
+     * Then: Post 타입 설정 2개만 조회
+     */
+    @Test
+    @DisplayName("T043: findByFiltersEntityTypeOnly - entityType 필터만 적용")
+    fun testFindByFiltersEntityTypeOnly() {
+        // given
+        vectorConfigRepository.save(
+            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true)
+        )
+        vectorConfigRepository.save(
+            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = false)
+        )
+        vectorConfigRepository.save(
+            VectorConfig(entityType = "Comment", fieldName = "text", weight = 1.5, enabled = true)
+        )
+
+        // when
+        val postConfigs = vectorConfigRepository.findByFilters(
+            entityType = "Post",
+            fieldName = null,
+            enabled = null
+        )
+
+        // then
+        assertThat(postConfigs).hasSize(2)
+        assertThat(postConfigs.map { it.fieldName })
+            .containsExactlyInAnyOrder("title", "content")
+    }
+
+    /**
+     * T044: findByFilters - 모든 파라미터 null (전체 조회)
+     *
+     * Given: 여러 설정 저장
+     * When: findByFilters(null, null, null) 호출
+     * Then: 모든 VectorConfig 반환
+     */
+    @Test
+    @DisplayName("T044: findByFiltersAllNull - 모든 파라미터 null 시 전체 조회")
+    fun testFindByFiltersAllNull() {
+        // given
+        vectorConfigRepository.save(
+            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0)
+        )
+        vectorConfigRepository.save(
+            VectorConfig(entityType = "Comment", fieldName = "text", weight = 1.5)
+        )
+
+        // when
+        val allConfigs = vectorConfigRepository.findByFilters(
+            entityType = null,
+            fieldName = null,
+            enabled = null
+        )
+
+        // then
+        assertThat(allConfigs).hasSizeGreaterThanOrEqualTo(2)
+    }
+
+    /**
+     * T045: findByFilters - 여러 조건 결합
+     *
+     * Given: Post.title(enabled=true), Post.content(enabled=false), Comment.text(enabled=true) 저장
+     * When: findByFilters(entityType="Post", fieldName="title", enabled=true) 호출
+     * Then: Post.title 설정 1개만 조회
+     */
+    @Test
+    @DisplayName("T045: findByFiltersMultipleConditions - entityType + fieldName + enabled 결합")
+    fun testFindByFiltersMultipleConditions() {
+        // given
+        vectorConfigRepository.save(
+            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true)
+        )
+        vectorConfigRepository.save(
+            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = false)
+        )
+        vectorConfigRepository.save(
+            VectorConfig(entityType = "Comment", fieldName = "text", weight = 1.5, enabled = true)
+        )
+
+        // when
+        val filtered = vectorConfigRepository.findByFilters(
+            entityType = "Post",
+            fieldName = "title",
+            enabled = true
+        )
+
+        // then
+        assertThat(filtered).hasSize(1)
+        assertThat(filtered.first().entityType).isEqualTo("Post")
+        assertThat(filtered.first().fieldName).isEqualTo("title")
+        assertThat(filtered.first().enabled).isTrue()
+    }
 }

@@ -8,9 +8,14 @@ import org.springframework.stereotype.Repository
  * VectorConfig 엔티티 Repository
  *
  * 벡터화 설정 데이터의 CRUD 작업 및 커스텀 조회 메서드를 제공합니다.
+ *
+ * Phase 4: QueryDSL 통합
+ * - VectorConfigCustomRepository 상속 (findByFilters 메서드 제공)
+ * - JpaRepository 기본 메서드 유지 (하위 호환성)
+ * - findByFilters()로 동적 필터링 가능 (entityType, fieldName, enabled 조합)
  */
 @Repository
-interface VectorConfigRepository : JpaRepository<VectorConfig, Long> {
+interface VectorConfigRepository : JpaRepository<VectorConfig, Long>, VectorConfigCustomRepository {
 
     /**
      * 특정 엔티티 타입의 모든 설정 조회
