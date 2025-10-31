@@ -10,11 +10,11 @@ import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 
 /**
- * Post 엔티티 Repository
- * Board/Forum 시스템용 게시글 관리
+ * Post Repository (QueryDSL 마이그레이션)
+ * JpaRepository + PostCustomRepository 통합
  */
 @Repository
-interface PostRepository : JpaRepository<Post, Long> {
+interface PostRepository : JpaRepository<Post, Long>, PostCustomRepository {
 
     /**
      * 삭제되지 않은 모든 게시글 조회 (페이지네이션)
@@ -33,6 +33,7 @@ interface PostRepository : JpaRepository<Post, Long> {
 
     /**
      * 해시태그로 게시글 수 조회 (카운트용)
+     * QueryDSL로 마이그레이션됨 (PostCustomRepository에서 구현)
      */
     @Query(
         value = """
@@ -42,7 +43,7 @@ interface PostRepository : JpaRepository<Post, Long> {
         """,
         nativeQuery = true
     )
-    fun countByHashtag(@Param("hashtag") hashtag: String): Long
+    override fun countByHashtag(@Param("hashtag") hashtag: String): Long
 
     /**
      * 해시태그로 게시글 검색 (페이지네이션)

@@ -39,3 +39,11 @@ fun com.querydsl.core.types.dsl.StringPath.ilike(pattern: String): BooleanExpres
         pattern
     )
 }
+
+// Array<FloatArray> 타입을 SimplePath<PGvector>로 변환
+fun com.querydsl.core.types.dsl.ArrayPath<FloatArray, com.querydsl.core.types.dsl.SimplePath<FloatArray>>.castToSimple(): com.querydsl.core.types.dsl.SimplePath<com.pgvector.PGvector> {
+    return com.querydsl.core.types.dsl.Expressions.path(
+        com.pgvector.PGvector::class.java,
+        this.metadata
+    )
+}

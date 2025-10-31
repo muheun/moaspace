@@ -67,27 +67,24 @@ class PostVectorService(
     }
 
     /**
-     * 쿼리 텍스트를 벡터로 변환
-     *
-     * 벡터 검색 시 사용됩니다.
+     * 쿼리 텍스트를 벡터로 변환 (QueryDSL 마이그레이션)
      *
      * @param queryText 검색 쿼리
-     * @return 768차원 벡터 (pgvector 문자열 형식)
+     * @return 768차원 벡터 (FloatArray)
      */
-    fun vectorizeQuery(queryText: String): String {
+    fun vectorizeQuery(queryText: String): FloatArray {
         require(queryText.isNotBlank()) { "쿼리가 비어있습니다." }
 
         logger.debug("쿼리 벡터화: queryText=${queryText.take(50)}...")
 
         val embedding = onnxEmbeddingService.generateEmbedding(queryText)
 
-        return "[${embedding.toArray().joinToString(",")}]"
+        return embedding.toArray()
     }
 
     /**
-     * 벡터 유사도 검색
-     *
-     * Constitution Principle III: 임계값 이상의 결과만 반환
+     * 벡터 유사도 검색 (QueryDSL 마이그레이션)
+     * 반환 타입: List<PostSimilarity> → PostEmbedding으로 변환
      *
      * @param queryText 검색 쿼리
      * @param threshold 유사도 임계값 (0.0~1.0, 기본 0.6)
@@ -106,18 +103,20 @@ class PostVectorService(
         logger.info("벡터 검색 시작: query=${queryText.take(50)}, threshold=$threshold, limit=$limit")
 
         val queryVector = vectorizeQuery(queryText)
-        val results = postEmbeddingRepository.findSimilarPosts(queryVector, threshold, limit)
+        val similarityResults = postEmbeddingRepository.findSimilarPosts(queryVector, threshold, limit)
 
-        logger.info("벡터 검색 완료: 결과 수=${results.size}")
+        // PostSimilarity → PostEmbedding 변환 (postId로 조회)
+        val postEmbeddings = similarityResults.mapNotNull { similarity ->
+            postEmbeddingRepository.findById(similarity.postId).orElse(null)
+        }
 
-        return results
+        logger.info("벡터 검색 완료: 결과 수=${postEmbeddings.size}")
+
+        return postEmbeddings
     }
 
     /**
-     * 벡터 유사도 검색 (유사도 점수 포함)
-     * T063-T064: POST /api/posts/search 엔드포인트용
-     *
-     * Constitution Principle III: 임계값 이상의 결과만 반환
+     * 벡터 유사도 검색 (유사도 점수 포함) - QueryDSL 마이그레이션
      *
      * @param queryText 검색 쿼리
      * @param threshold 유사도 임계값 (0.0~1.0, 기본 0.6)
@@ -136,17 +135,22 @@ class PostVectorService(
         logger.info("벡터 검색 (점수 포함) 시작: query=${queryText.take(50)}, threshold=$threshold, limit=$limit")
 
         val queryVector = vectorizeQuery(queryText)
-        val results = postEmbeddingRepository.findSimilarPosts(queryVector, threshold, limit)
+        val similarityResults = postEmbeddingRepository.findSimilarPosts(queryVector, threshold, limit)
 
-        val queryVectorArray = onnxEmbeddingService.generateEmbedding(queryText).toArray()
-        val similarities = results.associate { embedding ->
-            val similarity = 1.0 - cosineSimilarity(queryVectorArray, embedding.embedding)
-            embedding.id!! to similarity
+        // PostSimilarity → PostEmbedding 변환 + 유사도 Map 생성
+        val postEmbeddings = mutableListOf<PostEmbedding>()
+        val similarities = mutableMapOf<Long, Double>()
+
+        similarityResults.forEach { similarity ->
+            postEmbeddingRepository.findById(similarity.postId).ifPresent { embedding ->
+                postEmbeddings.add(embedding)
+                similarities[embedding.id!!] = similarity.similarity
+            }
         }
 
-        logger.info("벡터 검색 완료: 결과 수=${results.size}")
+        logger.info("벡터 검색 완료: 결과 수=${postEmbeddings.size}")
 
-        return Pair(results, similarities)
+        return Pair(postEmbeddings, similarities)
     }
 
     /**
