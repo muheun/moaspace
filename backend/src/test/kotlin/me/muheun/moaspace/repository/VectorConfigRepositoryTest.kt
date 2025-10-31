@@ -2,31 +2,41 @@ package me.muheun.moaspace.repository
 
 import me.muheun.moaspace.domain.VectorConfig
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
+import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.dao.DataIntegrityViolationException
-import org.springframework.test.context.jdbc.Sql
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.transaction.annotation.Transactional
+import jakarta.persistence.EntityManager
 
 /**
  * VectorConfigRepository 통합 테스트
  *
- * @DataJpaTest로 실제 DB 연동 테스트 수행
- * Constitution Principle V 준수: Real Database Integration + @Sql 초기화
+ * @SpringBootTest로 실제 DB 연동 테스트 수행
+ * Constitution Principle V 준수: Real Database Integration + @Transactional rollback
  */
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Sql(
-    scripts = ["/test-cleanup.sql"],
-    executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
-)
+@SpringBootTest
+@ActiveProfiles("test")
+@Transactional
 class VectorConfigRepositoryTest {
 
     @Autowired
     private lateinit var vectorConfigRepository: VectorConfigRepository
+
+    @Autowired
+    private lateinit var entityManager: EntityManager
+
+    @BeforeEach
+    fun setUp() {
+        // 각 테스트 전에 vector_configs 테이블 정리
+        entityManager.createNativeQuery("TRUNCATE TABLE vector_configs RESTART IDENTITY CASCADE").executeUpdate()
+        entityManager.flush()
+        entityManager.clear()
+    }
 
     /**
      * VectorConfig 저장 및 조회 테스트

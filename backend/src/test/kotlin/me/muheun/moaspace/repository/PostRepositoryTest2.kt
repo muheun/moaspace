@@ -6,12 +6,13 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
+import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
-import org.springframework.test.context.jdbc.Sql
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.transaction.annotation.Transactional
+import jakarta.persistence.EntityManager
+import org.junit.jupiter.api.BeforeEach
 
 /**
  * PostRepository 영속성 테스트
@@ -19,19 +20,27 @@ import org.springframework.test.context.jdbc.Sql
  * Constitution Principle VIII: content (HTML) + plainContent (Plain Text) 분리 저장 검증
  * Mock 테스트 절대 금지
  */
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Sql("/test-cleanup.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@SpringBootTest
+@ActiveProfiles("test")
+@Transactional
 class PostRepositoryTest2 {
 
     @Autowired
-    private lateinit var entityManager: TestEntityManager
+    private lateinit var entityManager: EntityManager
 
     @Autowired
     private lateinit var postRepository: PostRepository
 
     @Autowired
     private lateinit var userRepository: UserRepository
+
+    @BeforeEach
+    fun setUp() {
+        // 각 테스트 전에 관련 테이블들 정리 (CASCADE로 외래 키 처리)
+        entityManager.createNativeQuery("TRUNCATE TABLE posts, users RESTART IDENTITY CASCADE").executeUpdate()
+        entityManager.flush()
+        entityManager.clear()
+    }
 
     /**
      * Post 저장 테스트 (Constitution Principle VIII 준수)
@@ -55,7 +64,9 @@ class PostRepositoryTest2 {
         )
 
         // When
-        val savedPost = entityManager.persistAndFlush(post)
+        entityManager.persist(post)
+        entityManager.flush()
+        val savedPost = post
 
         // Then
         assertNotNull(savedPost.id)
@@ -84,7 +95,8 @@ class PostRepositoryTest2 {
         val activePost = createAndSavePost(user, "활성 게시글", "내용1")
         val deletedPost = createAndSavePost(user, "삭제된 게시글", "내용2")
         deletedPost.deleted = true
-        entityManager.persistAndFlush(deletedPost)
+        entityManager.persist(deletedPost)
+        entityManager.flush()
 
         // When
         val pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt"))
@@ -148,8 +160,9 @@ class PostRepositoryTest2 {
             author = user,
             hashtags = arrayOf("Java", "Backend")
         )
-        entityManager.persistAndFlush(post1)
-        entityManager.persistAndFlush(post2)
+        entityManager.persist(post1)
+        entityManager.persist(post2)
+        entityManager.flush()
 
         // When
         val posts = postRepository.findByHashtag("Kotlin", limit = 10, offset = 0)
@@ -206,7 +219,9 @@ class PostRepositoryTest2 {
         post.contentMarkdown = "수정된 내용"
         post.contentHtml = "<p>수정된 내용</p>"
         post.contentText = "수정된 내용"
-        val updatedPost = entityManager.persistAndFlush(post)
+        entityManager.persist(post)
+        entityManager.flush()
+        val updatedPost = post
 
         // Then
         assertEquals("수정된 제목", updatedPost.title)
@@ -232,7 +247,8 @@ class PostRepositoryTest2 {
 
         // When
         post.deleted = true
-        entityManager.persistAndFlush(post)
+        entityManager.persist(post)
+        entityManager.flush()
 
         // Then
         val deletedPost = postRepository.findById(post.id!!).orElse(null)
@@ -248,7 +264,9 @@ class PostRepositoryTest2 {
     // Helper Methods
     private fun createAndSaveUser(email: String, name: String): User {
         val user = User(email = email, name = name)
-        return entityManager.persistAndFlush(user)
+        entityManager.persist(user)
+        entityManager.flush()
+        return user
     }
 
     private fun createAndSavePost(user: User, title: String, textContent: String): Post {
@@ -259,6 +277,8 @@ class PostRepositoryTest2 {
             contentText = textContent,
             author = user
         )
-        return entityManager.persistAndFlush(post)
+        entityManager.persist(post)
+        entityManager.flush()
+        return post
     }
 }

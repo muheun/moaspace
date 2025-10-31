@@ -4,8 +4,8 @@ import me.muheun.moaspace.dto.VectorIndexRequest
 import me.muheun.moaspace.dto.VectorSearchRequest
 import me.muheun.moaspace.dto.VectorSearchResult
 import me.muheun.moaspace.event.VectorIndexingRequestedEvent
+import me.muheun.moaspace.query.dto.ChunkDetail
 import me.muheun.moaspace.repository.VectorChunkRepository
-import me.muheun.moaspace.repository.VectorChunkSearchResult
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -106,10 +106,10 @@ class UniversalVectorIndexingService(
         fieldResults.forEach { (fieldName, results) ->
             val weight = normalizedWeights[fieldName] ?: 0.0
             results.forEach { result ->
-                val key = RecordKey(result.getNamespace(), result.getEntity(), result.getRecordKey())
+                val key = RecordKey(result.namespace, result.entity, result.recordKey)
                 val current = recordScores[key] ?: WeightedScore(0.0, mutableMapOf())
-                current.totalScore += result.getScore() * weight
-                current.fieldScores[fieldName] = result.getScore()
+                current.totalScore += result.score * weight
+                current.fieldScores[fieldName] = result.score
                 recordScores[key] = current
             }
         }
@@ -123,9 +123,9 @@ class UniversalVectorIndexingService(
             val bestFieldResults = fieldResults[bestField] ?: return@mapNotNull null
 
             val chunkResult = bestFieldResults.firstOrNull {
-                it.getNamespace() == recordKey.namespace &&
-                it.getEntity() == recordKey.entity &&
-                it.getRecordKey() == recordKey.recordKey
+                it.namespace == recordKey.namespace &&
+                it.entity == recordKey.entity &&
+                it.recordKey == recordKey.recordKey
             } ?: return@mapNotNull null
 
             mapChunkToSearchResult(chunkResult, weightedScore.totalScore)
@@ -148,28 +148,28 @@ class UniversalVectorIndexingService(
         )
 
         return chunkResults.mapNotNull { result ->
-            mapChunkToSearchResult(result, result.getScore())
+            mapChunkToSearchResult(result, result.score)
         }
     }
 
     /**
-     * VectorChunkSearchResult를 VectorSearchResult로 변환
+     * ChunkDetail을 VectorSearchResult로 변환
      *
      * 중복 코드 제거를 위한 공통 매핑 메서드입니다.
      */
     private fun mapChunkToSearchResult(
-        chunkResult: VectorChunkSearchResult,
+        chunkResult: ChunkDetail,
         similarityScore: Double
     ): VectorSearchResult? {
-        val chunk = vectorChunkRepository.findById(chunkResult.getChunkId()).orElse(null)
+        val chunk = vectorChunkRepository.findById(chunkResult.chunkId).orElse(null)
             ?: return null
 
         return VectorSearchResult(
-            chunkId = chunkResult.getChunkId(),
-            namespace = chunkResult.getNamespace(),
-            entity = chunkResult.getEntity(),
-            recordKey = chunkResult.getRecordKey(),
-            fieldName = chunkResult.getFieldName(),
+            chunkId = chunkResult.chunkId,
+            namespace = chunkResult.namespace,
+            entity = chunkResult.entity,
+            recordKey = chunkResult.recordKey,
+            fieldName = chunkResult.fieldName,
             chunkText = chunk.chunkText,
             chunkIndex = chunk.chunkIndex,
             startPosition = chunk.startPosition,

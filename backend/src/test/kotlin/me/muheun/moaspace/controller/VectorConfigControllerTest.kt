@@ -6,16 +6,19 @@ import me.muheun.moaspace.dto.VectorConfigUpdateRequest
 import me.muheun.moaspace.repository.VectorConfigRepository
 import org.hamcrest.Matchers.greaterThan
 import org.hamcrest.Matchers.hasSize
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
-import org.springframework.test.context.jdbc.Sql
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import org.springframework.transaction.annotation.Transactional
+import jakarta.persistence.EntityManager
 
 /**
  * VectorConfigController REST API 통합 테스트
@@ -23,19 +26,26 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
  * Constitution Principle V 준수: Real Database Integration
  * - @SpringBootTest + MockMvc로 전체 HTTP 요청/응답 검증
  * - 실제 DB 사용 (Mock 금지)
- * - @Sql로 각 테스트 전 DB 초기화
+ * - @Transactional로 각 테스트 격리 및 롤백
  */
 @SpringBootTest
-@AutoConfigureMockMvc
-@Sql(
-    scripts = ["/test-cleanup.sql"],
-    executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
-)
+@ActiveProfiles("test")
+@AutoConfigureMockMvc(addFilters = false)
+@Transactional
 class VectorConfigControllerTest @Autowired constructor(
     private val mockMvc: MockMvc,
     private val objectMapper: ObjectMapper,
-    private val vectorConfigRepository: VectorConfigRepository
+    private val vectorConfigRepository: VectorConfigRepository,
+    private val entityManager: EntityManager
 ) {
+
+    @BeforeEach
+    fun setUp() {
+        // 각 테스트 전에 vector_configs 테이블 정리
+        entityManager.createNativeQuery("TRUNCATE TABLE vector_configs RESTART IDENTITY CASCADE").executeUpdate()
+        entityManager.flush()
+        entityManager.clear()
+    }
 
     @Test
     @DisplayName("POST /api/vector-configs - 새로운 벡터 설정 생성 (201 Created)")

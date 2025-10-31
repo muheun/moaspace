@@ -7,6 +7,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
 import kotlin.math.sqrt
 
 /**
@@ -21,6 +22,7 @@ import kotlin.math.sqrt
  * - 형태소 분석 기본 동작 확인
  */
 @SpringBootTest
+@ActiveProfiles("test")  // TestSecurityConfig 사용으로 OAuth2 설정 문제 해결
 @DisplayName("[T002] ONNX 프로토타입 테스트 - MPNet 768차원")
 class OnnxPrototypeTest {
 

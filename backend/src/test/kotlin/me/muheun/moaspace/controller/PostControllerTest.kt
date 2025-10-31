@@ -9,17 +9,19 @@ import me.muheun.moaspace.repository.PostEmbeddingRepository
 import me.muheun.moaspace.repository.PostRepository
 import me.muheun.moaspace.repository.UserRepository
 import me.muheun.moaspace.service.JwtTokenService
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
-import org.springframework.test.context.jdbc.Sql
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.transaction.annotation.Transactional
+import jakarta.persistence.EntityManager
 
 /**
  * PostController 통합 테스트
@@ -36,9 +38,9 @@ import org.springframework.transaction.annotation.Transactional
  * - 인증 오류 처리 (401 Unauthorized)
  */
 @SpringBootTest
-@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@AutoConfigureMockMvc  // Security 필터 활성화 (TestSecurityConfig 사용)
 @Transactional
-@Sql("/test-cleanup.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class PostControllerTest {
 
     @Autowired
@@ -46,6 +48,17 @@ class PostControllerTest {
 
     @Autowired
     private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var entityManager: EntityManager
+
+    @BeforeEach
+    fun setUp() {
+        // 각 테스트 전에 관련 테이블들 정리 (CASCADE로 외래 키 처리)
+        entityManager.createNativeQuery("TRUNCATE TABLE posts, post_embeddings, users RESTART IDENTITY CASCADE").executeUpdate()
+        entityManager.flush()
+        entityManager.clear()
+    }
 
     @Autowired
     private lateinit var postRepository: PostRepository

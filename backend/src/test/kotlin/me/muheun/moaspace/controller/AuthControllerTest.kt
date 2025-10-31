@@ -3,18 +3,20 @@ package me.muheun.moaspace.controller
 import me.muheun.moaspace.domain.user.User
 import me.muheun.moaspace.repository.UserRepository
 import me.muheun.moaspace.service.JwtTokenService
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.jdbc.Sql
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
+import jakarta.persistence.EntityManager
 
 /**
  * AuthController 통합 테스트
@@ -30,9 +32,9 @@ import org.springframework.transaction.annotation.Transactional
  * - POST /api/auth/logout: 로그아웃 성공 (204 No Content)
  */
 @SpringBootTest
-@AutoConfigureMockMvc
+@ActiveProfiles("test")
+@AutoConfigureMockMvc  // Security 필터 활성화 (TestSecurityConfig 사용)
 @Transactional
-@Sql("/test-cleanup.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class AuthControllerTest {
 
     @Autowired
@@ -43,6 +45,17 @@ class AuthControllerTest {
 
     @Autowired
     private lateinit var jwtTokenService: JwtTokenService
+
+    @Autowired
+    private lateinit var entityManager: EntityManager
+
+    @BeforeEach
+    fun setUp() {
+        // 각 테스트 전에 users 테이블 정리
+        entityManager.createNativeQuery("TRUNCATE TABLE users RESTART IDENTITY CASCADE").executeUpdate()
+        entityManager.flush()
+        entityManager.clear()
+    }
 
     /**
      * T034: JWT 토큰 검증 테스트

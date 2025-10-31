@@ -5,11 +5,13 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
 
 /**
  * TokenizerService 단위 테스트
  */
 @SpringBootTest
+@ActiveProfiles("test")
 @DisplayName("TokenizerService 단위 테스트")
 class TokenizerServiceTest {
 

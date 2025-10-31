@@ -2,29 +2,40 @@ package me.muheun.moaspace.repository
 
 import me.muheun.moaspace.domain.user.User
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager
-import org.springframework.test.context.jdbc.Sql
+import jakarta.persistence.EntityManager
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * UserRepository 영속성 테스트
- * Constitution Principle V: 실제 DB 연동 테스트 (@DataJpaTest + AutoConfigureTestDatabase.Replace.NONE)
+ * Constitution Principle V: 실제 DB 연동 테스트 (@SpringBootTest + @Transactional)
  * Mock 테스트 절대 금지
+ *
+ * @Transactional: 각 테스트가 트랜잭션 내에서 실행되고 종료 후 롤백되어 DB 격리 보장
  */
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Sql("/test-cleanup.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@SpringBootTest
+@ActiveProfiles("test")
+@Transactional
 class UserRepositoryTest {
 
     @Autowired
-    private lateinit var entityManager: TestEntityManager
+    private lateinit var entityManager: EntityManager
 
     @Autowired
     private lateinit var userRepository: UserRepository
+
+    @BeforeEach
+    fun setUp() {
+        // 각 테스트 전에 users 테이블 정리
+        entityManager.createNativeQuery("TRUNCATE TABLE users RESTART IDENTITY CASCADE").executeUpdate()
+        entityManager.flush()
+        entityManager.clear()
+    }
 
     /**
      * User 저장 테스트 (모든 필드)
@@ -44,7 +55,8 @@ class UserRepositoryTest {
         )
 
         // When
-        val savedUser = entityManager.persistAndFlush(user)
+        val savedUser = userRepository.save(user)
+        entityManager.flush()
 
         // Then
         assertNotNull(savedUser.id)
@@ -69,7 +81,8 @@ class UserRepositoryTest {
             email = "find@example.com",
             name = "검색 사용자"
         )
-        entityManager.persistAndFlush(user)
+        userRepository.save(user)
+        entityManager.flush()
 
         // When
         val foundUser = userRepository.findByEmail("find@example.com")
@@ -111,7 +124,8 @@ class UserRepositoryTest {
             email = "exists@example.com",
             name = "존재 확인 사용자"
         )
-        entityManager.persistAndFlush(user)
+        userRepository.save(user)
+        entityManager.flush()
 
         // When & Then
         assertTrue(userRepository.existsByEmail("exists@example.com"))
@@ -133,7 +147,8 @@ class UserRepositoryTest {
             email = "unique@example.com",
             name = "사용자1"
         )
-        entityManager.persistAndFlush(user1)
+        userRepository.save(user1)
+        entityManager.flush()
 
         // When & Then
         val user2 = User(
@@ -142,7 +157,8 @@ class UserRepositoryTest {
         )
 
         assertThrows(Exception::class.java) {
-            entityManager.persistAndFlush(user2)
+            userRepository.save(user2)
+            entityManager.flush()
         }
     }
 
@@ -164,7 +180,8 @@ class UserRepositoryTest {
         )
 
         // When
-        val savedUser = entityManager.persistAndFlush(user)
+        val savedUser = userRepository.save(user)
+        entityManager.flush()
 
         // Then
         assertNotNull(savedUser.id)

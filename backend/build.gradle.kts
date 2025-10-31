@@ -53,6 +53,14 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
+    // Kotlin JDSL 3.6.0 (타입 안전 쿼리 DSL)
+    implementation("com.linecorp.kotlin-jdsl:jpql-dsl:3.6.0")
+    implementation("com.linecorp.kotlin-jdsl:jpql-render:3.6.0")
+    implementation("com.linecorp.kotlin-jdsl:spring-data-jpa-support:3.6.0")
+
+    // MyBatis 3.0.3 (JPQL 미지원 쿼리: CTE, Window Function)
+    implementation("org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.3")
+
     // PostgreSQL & pgvector
     implementation("org.postgresql:postgresql")  // Flyway에서도 사용하도록 implementation으로 변경
     implementation("com.pgvector:pgvector:0.1.4")

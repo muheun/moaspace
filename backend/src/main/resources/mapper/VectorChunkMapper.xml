@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  VectorChunk MyBatis Mapper XML
+
+  **Constitution Principle VI 준수 - JPQL 미지원 쿼리 처리**:
+  - Kotlin JDSL: JPQL 지원 쿼리 (GROUP BY, JOIN, WHERE 등)
+  - MyBatis: JPQL 미지원 쿼리 (CTE, Window Function)
+
+  **XML 이스케이프 처리**:
+  - pgvector 연산자 `<=>` → XML에서 `&lt;=&gt;`로 이스케이프 필요
+  - CDATA 섹션 사용 시 이스케이프 불필요: <![CDATA[ ... ]]>
+
+  @see me.muheun.moaspace.mapper.VectorChunkMapper
+-->
+<mapper namespace="me.muheun.moaspace.mapper.VectorChunkMapper">
+
+    <!--
+      레코드별 유사도 검색 (GROUP BY + MAX aggregation)
+
+      **MyBatis 사용 이유**: pgvector `<=>` 연산자 - JPQL 미지원
+
+      SQL 구조:
+      1. pgvector 코사인 유사도 계산: 1 - (chunk_vector <=> query_vector)
+      2. GROUP BY record_key: 레코드별 집계
+      3. MAX(score): 레코드당 최고 스코어만 선택
+      4. 동적 필터링: namespace, entity (nullable)
+
+      @param queryVector 검색 벡터 (768차원)
+      @param namespace 네임스페이스 필터 (nullable)
+      @param entity 엔티티 필터 (nullable)
+      @param limit 결과 개수 제한
+      @return RecordSimilarityScore 목록
+    -->
+    <select id="findSimilarRecords" resultType="me.muheun.moaspace.query.dto.RecordSimilarityScore">
+        <![CDATA[
+        SELECT
+            v.record_key as recordKey,
+            MAX(1 - (v.chunk_vector <=> CAST(#{queryVector} AS vector))) as score
+        FROM vector_chunk v
+        WHERE v.chunk_vector IS NOT NULL
+        ]]>
+            <!-- 동적 조건: namespace (nullable) -->
+            <if test="namespace != null">
+                AND v.namespace = #{namespace}
+            </if>
+            <!-- 동적 조건: entity (nullable) -->
+            <if test="entity != null">
+                AND v.entity = #{entity}
+            </if>
+        <![CDATA[
+        GROUP BY v.record_key
+        ORDER BY score DESC
+        LIMIT #{limit}
+        ]]>
+    </select>
+
+    <!--
+      청크 상세 정보 포함 검색 (CTE + Window Function)
+
+      **MyBatis 사용 이유**: ROW_NUMBER() OVER (PARTITION BY) - JPQL 미지원
+
+      SQL 구조:
+      1. CTE (ranked_chunks): 각 청크에 대해 record별로 순위 계산
+      2. ROW_NUMBER() OVER: 파티션별로 score 기준 내림차순 순위
+      3. WHERE rank = 1: 각 record의 최고 스코어 청크만 선택
+
+      @param queryVector 검색 벡터 (768차원)
+      @param namespace 네임스페이스 필터 (nullable)
+      @param entity 엔티티 필터 (nullable)
+      @param fieldName 필드명 필터 (nullable)
+      @param limit 결과 개수 제한
+      @return ChunkDetail 목록
+    -->
+    <select id="findTopChunksByRecord" resultType="me.muheun.moaspace.query.dto.ChunkDetail">
+        <![CDATA[
+        WITH ranked_chunks AS (
+            SELECT
+                v.id,
+                v.namespace,
+                v.entity,
+                v.record_key,
+                v.field_name,
+                1 - (v.chunk_vector <=> CAST(#{queryVector} AS vector)) as score,
+                ROW_NUMBER() OVER (
+                    PARTITION BY v.namespace, v.entity, v.record_key
+                    ORDER BY (1 - (v.chunk_vector <=> CAST(#{queryVector} AS vector))) DESC
+                ) as rank
+            FROM vector_chunk v
+            WHERE v.chunk_vector IS NOT NULL
+        ]]>
+                <!-- 동적 조건: namespace (nullable) -->
+                <if test="namespace != null">
+                    AND v.namespace = #{namespace}
+                </if>
+                <!-- 동적 조건: entity (nullable) -->
+                <if test="entity != null">
+                    AND v.entity = #{entity}
+                </if>
+                <!-- 동적 조건: fieldName (nullable) -->
+                <if test="fieldName != null">
+                    AND v.field_name = #{fieldName}
+                </if>
+        <![CDATA[
+        )
+        SELECT
+            id as chunkId,
+            namespace,
+            entity,
+            record_key as recordKey,
+            field_name as fieldName,
+            score
+        FROM ranked_chunks
+        WHERE rank = 1
+        ORDER BY score DESC
+        LIMIT #{limit}
+        ]]>
+    </select>
+
+    <!--
+      필드별 가중치 벡터 검색 (CTE + CASE WHEN)
+
+      **MyBatis 사용 이유**: CTE (WITH ...) - JPQL 미지원
+
+      SQL 구조:
+      1. CTE (field_scores): 필드별 (title, content) 최대 유사도 계산
+      2. CASE WHEN: 필드별 가중치 적용 (titleWeight, contentWeight)
+      3. SUM(): 가중치 적용된 스코어 합산
+
+      @param queryVector 검색 벡터 (768차원)
+      @param namespace 네임스페이스 (필수)
+      @param entity 엔티티 (필수)
+      @param titleWeight 제목 가중치
+      @param contentWeight 내용 가중치
+      @param limit 결과 개수 제한
+      @return WeightedScore 목록
+    -->
+    <select id="findByWeightedFieldScore" resultType="me.muheun.moaspace.query.dto.WeightedScore">
+        <![CDATA[
+        WITH field_scores AS (
+            SELECT
+                v.record_key,
+                v.field_name,
+                MAX(1 - (v.chunk_vector <=> CAST(#{queryVector} AS vector))) as score
+            FROM vector_chunk v
+            WHERE v.chunk_vector IS NOT NULL
+                AND v.namespace = #{namespace}
+                AND v.entity = #{entity}
+                AND v.field_name IN ('title', 'content')
+            GROUP BY v.record_key, v.field_name
+        )
+        SELECT
+            record_key as recordKey,
+            SUM(CASE
+                WHEN field_name = 'title' THEN score * #{titleWeight}
+                WHEN field_name = 'content' THEN score * #{contentWeight}
+                ELSE score
+            END) as weightedScore
+        FROM field_scores
+        GROUP BY record_key
+        ORDER BY weightedScore DESC
+        LIMIT #{limit}
+        ]]>
+    </select>
+
+    <!--
+      조건별 청크 삭제 (동적 필터링)
+
+      **MyBatis 사용 이유**: 코드에 쿼리 문자열 Zero (Constitution VI v2.5.0)
+
+      SQL 구조:
+      1. DELETE FROM vector_chunk
+      2. 필수 조건: namespace, entity, record_key
+      3. 선택 조건: field_name (nullable - 동적 SQL로 처리)
+
+      **동적 SQL 처리**:
+      - fieldName != null: 해당 필드만 삭제
+      - fieldName == null: 모든 필드 삭제 (조건 제외)
+
+      @param namespace 네임스페이스 (필수)
+      @param entity 엔티티 (필수)
+      @param recordKey 레코드 키 (필수)
+      @param fieldName 필드명 (nullable)
+      @return 삭제된 레코드 수
+    -->
+    <delete id="deleteByFilters">
+        DELETE FROM vector_chunk
+        WHERE namespace = #{namespace}
+          AND entity = #{entity}
+          AND record_key = #{recordKey}
+        <!-- 동적 조건: fieldName (nullable) -->
+        <if test="fieldName != null">
+          AND field_name = #{fieldName}
+        </if>
+    </delete>
+
+</mapper>

@@ -46,6 +46,13 @@ spring:
         order_updates: true
     open-in-view: false
 
+# MyBatis 설정 (JPQL 미지원 쿼리: CTE, Window Function)
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: me.muheun.moaspace.query.dto
+  configuration:
+    map-underscore-to-camel-case: true
+
   # Google OAuth2 설정 (T018)
   security:
     oauth2:

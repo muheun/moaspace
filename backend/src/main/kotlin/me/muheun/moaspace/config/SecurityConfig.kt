@@ -3,6 +3,7 @@ package me.muheun.moaspace.config
 import me.muheun.moaspace.service.JwtTokenService
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Profile
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
@@ -26,8 +27,11 @@ import javax.crypto.spec.SecretKeySpec
  * - OAuth2 Resource Server (NimbusJwtDecoder)
  * - CORS 설정 (localhost:3000 허용)
  * - 공개 엔드포인트 허용 (인증 불필요)
+ *
+ * @Profile("!test"): 테스트 환경에서는 Security 설정 비활성화
  */
 @Configuration
+@Profile("!test")
 @EnableWebSecurity
 class SecurityConfig(
     private val oauth2SuccessHandler: me.muheun.moaspace.security.OAuth2SuccessHandler,

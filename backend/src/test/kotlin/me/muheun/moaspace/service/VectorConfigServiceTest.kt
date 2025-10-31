@@ -4,12 +4,15 @@ import me.muheun.moaspace.dto.VectorConfigCreateRequest
 import me.muheun.moaspace.dto.VectorConfigUpdateRequest
 import me.muheun.moaspace.repository.VectorConfigRepository
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.jdbc.Sql
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.transaction.annotation.Transactional
+import jakarta.persistence.EntityManager
 import kotlin.system.measureTimeMillis
 
 /**
@@ -18,17 +21,24 @@ import kotlin.system.measureTimeMillis
  * Constitution Principle V 준수: Real Database Integration
  * - @SpringBootTest로 전체 컨텍스트 로드
  * - 실제 DB 사용 (Mock 금지)
- * - @Sql로 각 테스트 전 DB 초기화
+ * - @Transactional로 각 테스트 격리 및 롤백
  */
 @SpringBootTest
-@Sql(
-    scripts = ["/test-cleanup.sql"],
-    executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
-)
+@ActiveProfiles("test")
+@Transactional
 class VectorConfigServiceTest @Autowired constructor(
     private val vectorConfigService: VectorConfigService,
-    private val vectorConfigRepository: VectorConfigRepository
+    private val vectorConfigRepository: VectorConfigRepository,
+    private val entityManager: EntityManager
 ) {
+
+    @BeforeEach
+    fun setUp() {
+        // 각 테스트 전에 vector_configs 테이블 정리
+        entityManager.createNativeQuery("TRUNCATE TABLE vector_configs RESTART IDENTITY CASCADE").executeUpdate()
+        entityManager.flush()
+        entityManager.clear()
+    }
 
     @Test
     @DisplayName("create - 새로운 벡터 설정을 생성한다")

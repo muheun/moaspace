@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.transaction.annotation.Transactional
 
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional
  * 비즈니스 로직만 검증합니다.
  */
 @SpringBootTest
+@ActiveProfiles("test")
 @DisplayName("VectorProcessingService 유닛 테스트")
 @Sql(
     scripts = ["/test-cleanup.sql"],

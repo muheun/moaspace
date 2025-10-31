@@ -9,6 +9,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 
 /**
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional
  * - 각 테스트 후 수동으로 데이터 정리
  */
 @SpringBootTest
+@ActiveProfiles("test")
 @DisplayName("UniversalVectorIndexingService 테스트")
 class UniversalVectorIndexingServiceTest {
 
