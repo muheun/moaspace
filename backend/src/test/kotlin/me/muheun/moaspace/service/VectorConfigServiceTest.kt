@@ -375,7 +375,7 @@ class VectorConfigServiceTest @Autowired constructor(
     @DisplayName("캐시 성능 측정 - 캐시 히트 < 10ms, 캐시 미스 < 100ms (헌법 Principle 요구사항)")
     fun testCachePerformance() {
         // given: 설정 생성 (캐시에 데이터 준비)
-        val created = vectorConfigService.create(
+        vectorConfigService.create(
             VectorConfigCreateRequest(entityType = "Performance", fieldName = "test", weight = 1.0)
         )
 

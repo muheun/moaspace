@@ -455,7 +455,7 @@ class PostControllerTest {
         val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
 
         // When: GET /api/posts?page=0&size=10
-        val page0Result = mockMvc.perform(
+        mockMvc.perform(
             get("/api/posts")
                 .param("page", "0")
                 .param("size", "10")

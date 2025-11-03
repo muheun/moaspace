@@ -92,7 +92,7 @@ class PostRepositoryTest {
     fun testFindNonDeletedPosts() {
         // Given
         val user = createAndSaveUser("find@example.com", "검색 사용자")
-        val activePost = createAndSavePost(user, "활성 게시글", "내용1")
+        createAndSavePost(user, "활성 게시글", "내용1")
         val deletedPost = createAndSavePost(user, "삭제된 게시글", "내용2")
         deletedPost.deleted = true
         entityManager.persist(deletedPost)

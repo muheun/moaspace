@@ -65,21 +65,21 @@ class PostEmbeddingRepositoryTest {
 
             // 게시글 1: 높은 유사도 (0.9 예상)
             val post1 = createAndSavePost(user, "Kotlin QueryDSL 가이드", "Kotlin 내용")
-            val embedding1 = createAndSaveEmbedding(post1, createSimilarVector(0.9f))
+            createAndSaveEmbedding(post1, createSimilarVector(0.9f))
 
             // 게시글 2: 중간 유사도 (0.7 예상)
             val post2 = createAndSavePost(user, "Spring Boot 튜토리얼", "Spring 내용")
-            val embedding2 = createAndSaveEmbedding(post2, createSimilarVector(0.7f))
+            createAndSaveEmbedding(post2, createSimilarVector(0.7f))
 
             // 게시글 3: 낮은 유사도 (0.5 예상) - threshold 미달로 제외되어야 함
             val post3 = createAndSavePost(user, "React 컴포넌트", "React 내용")
-            val embedding3 = createAndSaveEmbedding(post3, createSimilarVector(0.5f))
+            createAndSaveEmbedding(post3, createSimilarVector(0.5f))
 
             // 게시글 4: 삭제된 게시글 (높은 유사도지만 제외되어야 함)
             val post4 = createAndSavePost(user, "삭제된 게시글", "삭제 내용")
             post4.deleted = true
             entityManager.persist(post4)
-            val embedding4 = createAndSaveEmbedding(post4, createSimilarVector(0.95f))
+            createAndSaveEmbedding(post4, createSimilarVector(0.95f))
 
             entityManager.flush()
             post4.id // 반환
@@ -125,7 +125,7 @@ class PostEmbeddingRepositoryTest {
     @DisplayName("[QueryDSL] testFindSimilarPostsWithLimit - limit 파라미터 작동 확인")
     fun testFindSimilarPostsWithLimit() {
         // Given: 별도 트랜잭션에서 데이터 생성 및 커밋
-        val lastPostId = transactionTemplate.execute {
+        transactionTemplate.execute {
             val user = createAndSaveUser("limit@example.com", "리미트 사용자")
 
             // 동일한 벡터를 사용하여 유사도 1.0 보장 (queryVector와 정확히 동일)
@@ -134,7 +134,7 @@ class PostEmbeddingRepositoryTest {
             var lastId: Long? = null
             for (i in 1..5) {
                 val post = createAndSavePost(user, "게시글 $i", "내용 $i")
-                val embedding = createAndSaveEmbedding(post, identicalVector) // 모두 동일한 벡터
+                createAndSaveEmbedding(post, identicalVector) // 모두 동일한 벡터
                 lastId = post.id
             }
             entityManager.flush()
