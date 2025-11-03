@@ -117,7 +117,7 @@ class PostEmbeddingRepositoryTest {
     /**
      * QueryDSL findSimilarPosts() - limit 테스트
      *
-     * Given: 5개의 게시글 + 임베딩 (모두 threshold 이상)
+     * Given: 5개의 게시글 + 임베딩 (모두 동일한 벡터 = threshold 1.0)
      * When: findSimilarPosts(queryVector, threshold=0.5, limit=3)
      * Then: 상위 3개만 반환
      */
@@ -125,16 +125,21 @@ class PostEmbeddingRepositoryTest {
     @DisplayName("[QueryDSL] testFindSimilarPostsWithLimit - limit 파라미터 작동 확인")
     fun testFindSimilarPostsWithLimit() {
         // Given: 별도 트랜잭션에서 데이터 생성 및 커밋
-        transactionTemplate.execute {
+        val lastPostId = transactionTemplate.execute {
             val user = createAndSaveUser("limit@example.com", "리미트 사용자")
 
+            // 동일한 벡터를 사용하여 유사도 1.0 보장 (queryVector와 정확히 동일)
+            val identicalVector = createQueryVector()
+
+            var lastId: Long? = null
             for (i in 1..5) {
-                val similarityTarget = 0.8f - i * 0.05f
                 val post = createAndSavePost(user, "게시글 $i", "내용 $i")
-                val embedding = createAndSaveEmbedding(post, createSimilarVector(similarityTarget))
+                val embedding = createAndSaveEmbedding(post, identicalVector) // 모두 동일한 벡터
+                lastId = post.id
             }
             entityManager.flush()
-        }
+            lastId // 반환값이 있어야 트랜잭션이 커밋됨
+        }!!
         // 트랜잭션 커밋 완료
 
         entityManager.clear()
