@@ -8,18 +8,11 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  createPost,
-  getPostById,
-  getPosts,
-  updatePost,
-  deletePost,
-  searchPostsByVector,
-} from '@/lib/api/posts';
+import { postsApi } from '@/lib/api/posts';
 import type {
   CreatePostRequest,
   UpdatePostRequest,
-  PostResponse,
+  PostDto,
   PostListResponse,
   VectorSearchRequest,
   VectorSearchResponse,
@@ -49,7 +42,7 @@ export function useCreatePost() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (request: CreatePostRequest) => createPost(request),
+    mutationFn: (request: CreatePostRequest) => postsApi.createPost(request),
     onSuccess: () => {
       // 게시글 목록 캐시 무효화 (새 게시글 반영)
       queryClient.invalidateQueries({ queryKey: postKeys.lists() });
@@ -69,7 +62,7 @@ export function useCreatePost() {
 export function usePost(id: number, enabled: boolean = true) {
   return useQuery({
     queryKey: postKeys.detail(id),
-    queryFn: () => getPostById(id),
+    queryFn: () => postsApi.getPostById(id),
     enabled,
   });
 }
@@ -92,7 +85,7 @@ export function usePosts(
 ) {
   return useQuery({
     queryKey: postKeys.list(page, size, hashtag),
-    queryFn: () => getPosts(page, size, hashtag),
+    queryFn: () => postsApi.getPosts(page, size, hashtag),
   });
 }
 
@@ -108,7 +101,7 @@ export function useUpdatePost() {
 
   return useMutation({
     mutationFn: ({ id, request }: { id: number; request: UpdatePostRequest }) =>
-      updatePost(id, request),
+      postsApi.updatePost(id, request),
     onSuccess: (data) => {
       // 해당 게시글 상세 캐시 업데이트
       queryClient.setQueryData(postKeys.detail(data.id), data);
@@ -129,7 +122,7 @@ export function useDeletePost() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => deletePost(id),
+    mutationFn: (id: number) => postsApi.deletePost(id),
     onSuccess: (_, id) => {
       // 삭제된 게시글 캐시 제거
       queryClient.removeQueries({ queryKey: postKeys.detail(id) });
@@ -155,7 +148,7 @@ export function useSearchPosts(
 ) {
   return useQuery({
     queryKey: postKeys.search(request.query),
-    queryFn: () => searchPostsByVector(request),
+    queryFn: () => postsApi.searchPosts(request),
     enabled,
   });
 }

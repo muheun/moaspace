@@ -53,11 +53,18 @@ api.interceptors.response.use(
         break;
       case 401:
         userMessage = '로그인이 만료되었습니다. 다시 로그인해주세요.';
-        // JWT 만료 또는 인증 실패
+        // JWT 만료 또는 인증 실패 - localStorage + Cookie 제거 후 리다이렉트
         if (typeof window !== 'undefined') {
+          // 동기 import 사용 (require는 동기, dynamic import는 비동기)
+          const { isProtectedRoute } = require('@/lib/constants/routes');
+
           localStorage.removeItem('access_token');
-          // 이미 로그인 페이지에 있으면 리다이렉트하지 않음 (무한 루프 방지)
-          if (window.location.pathname !== '/login') {
+          document.cookie = 'access_token=; Max-Age=0; path=/;';
+
+          const currentPath = window.location.pathname;
+
+          // Protected route이고 이미 로그인 페이지가 아닐 때만 리다이렉트
+          if (isProtectedRoute(currentPath) && currentPath !== '/login') {
             window.location.href = '/login';
           }
         }
@@ -92,9 +99,10 @@ api.interceptors.response.use(
     }
 
     // 에러 객체에 사용자 친화적 메시지 추가
-    const enhancedError = new Error(userMessage);
-    (enhancedError as any).status = status;
-    (enhancedError as any).originalError = error;
+    const enhancedError = Object.assign(new Error(userMessage), {
+      status,
+      originalError: error,
+    });
 
     return Promise.reject(enhancedError);
   }

@@ -56,7 +56,7 @@ export default function EditPostPage({
   useEffect(() => {
     if (post && !isInitialized) {
       setTitle(post.title);
-      setContent(post.content);
+      setContent(post.contentHtml);
       setHashtags(post.hashtags.join(', '));
       setIsInitialized(true);
     }
@@ -76,13 +76,8 @@ export default function EditPostPage({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!user) {
-      toast.error('로그인이 필요합니다');
-      router.push('/login');
-      return;
-    }
-
-    if (!post) {
+    // Layout이 이미 로그인 체크 완료, 권한만 확인
+    if (!post || !user) {
       return;
     }
 
@@ -112,8 +107,9 @@ export default function EditPostPage({
         id: postId,
         request: {
           title: title.trim(),
-          content,
-          plainContent: plainContent.trim(),
+          contentMarkdown: content, // TODO: Lexical에서 마크다운 직접 생성 필요
+          contentHtml: content,
+          contentText: plainContent.trim(),
           hashtags: hashtagArray,
         },
       },

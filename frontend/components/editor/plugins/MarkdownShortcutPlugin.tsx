@@ -24,7 +24,6 @@ export function MarkdownShortcutPlugin() {
     // 마크다운 변환기 등록
     return editor.registerUpdateListener(() => {
       // 필요 시 마크다운 변환 로직 추가
-      });
     });
   }, [editor]);
 

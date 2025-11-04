@@ -14,6 +14,7 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { usePosts, useSearchPosts } from '@/lib/hooks/usePosts';
 import { PostList } from '@/components/posts/PostList';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertCircle, PenSquare } from 'lucide-react';
 
 /**
  * T095: SearchBar 컴포넌트 지연 로딩
@@ -113,15 +114,23 @@ export default function PostsPage() {
   return (
     <ErrorBoundary>
       <div className="container mx-auto px-4 py-8">
-        <header className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">게시글 목록</h1>
-          <p className="text-muted-foreground">
-            {searchMode === 'vector'
-              ? '벡터 검색 결과'
-              : hashtag
-                ? `#${hashtag} 태그 게시글`
-                : '모든 게시글'}
-          </p>
+        <header className="mb-8 flex items-start justify-between">
+          <div>
+            <h1 className="text-4xl font-bold mb-2">게시글 목록</h1>
+            <p className="text-muted-foreground">
+              {searchMode === 'vector'
+                ? '벡터 검색 결과'
+                : hashtag
+                  ? `#${hashtag} 태그 게시글`
+                  : '모든 게시글'}
+            </p>
+          </div>
+          <Button asChild size="default" className="min-h-11">
+            <Link href="/posts/new">
+              <PenSquare className="w-4 h-4 mr-2" />
+              새 게시글 작성
+            </Link>
+          </Button>
         </header>
 
         {/* 검색 바 */}
@@ -167,7 +176,7 @@ export default function PostsPage() {
                   {/* 유사도 점수 표시 */}
                   <div className="absolute top-4 right-4 z-10">
                     <Badge variant="secondary" className="font-mono">
-                      {(result.similarity * 100).toFixed(1)}%
+                      {(result.similarityScore * 100).toFixed(1)}%
                     </Badge>
                   </div>
                   <PostList posts={[result.post]} isLoading={false} />

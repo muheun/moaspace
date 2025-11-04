@@ -35,6 +35,8 @@ import javax.crypto.spec.SecretKeySpec
 @EnableWebSecurity
 class SecurityConfig(
     private val oauth2SuccessHandler: me.muheun.moaspace.security.OAuth2SuccessHandler,
+    private val oauth2FailureHandler: me.muheun.moaspace.security.OAuth2FailureHandler,
+    private val restAuthenticationEntryPoint: me.muheun.moaspace.security.RestAuthenticationEntryPoint,
     private val jwtTokenService: JwtTokenService
 ) {
 
@@ -59,6 +61,11 @@ class SecurityConfig(
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             }
 
+            // 인증 예외 처리 (OAuth2 Login보다 먼저 설정)
+            .exceptionHandling { exception ->
+                exception.authenticationEntryPoint(restAuthenticationEntryPoint)
+            }
+
             // OAuth2 Resource Server 설정 (JWT 자동 검증)
             .oauth2ResourceServer { oauth2 ->
                 oauth2.jwt { jwt ->
@@ -74,7 +81,6 @@ class SecurityConfig(
                         "/",
                         "/error",
                         "/api/health",
-                        "/api/auth/login",
                         "/api/auth/logout",
                         "/login/**",
                         "/oauth2/**"
@@ -94,9 +100,6 @@ class SecurityConfig(
             // OAuth2 로그인 설정
             .oauth2Login { oauth2 ->
                 oauth2
-                    // OAuth2 로그인 페이지 경로 설정
-                    .loginPage("/api/auth/login")
-
                     // OAuth2 인증 후 리다이렉트 엔드포인트
                     .redirectionEndpoint { redirection ->
                         redirection.baseUri("/login/oauth2/code/*")
@@ -104,6 +107,9 @@ class SecurityConfig(
 
                     // OAuth2 인증 성공 핸들러 등록 (T029)
                     .successHandler(oauth2SuccessHandler)
+
+                    // OAuth2 인증 실패 핸들러 등록
+                    .failureHandler(oauth2FailureHandler)
             }
 
         return http.build()

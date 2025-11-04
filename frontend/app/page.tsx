@@ -1,220 +1,125 @@
-'use client';
-
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { postsApi, type Post, type VectorSearchResult } from '@/lib/api';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { formatDistance } from 'date-fns';
-import { ko } from 'date-fns/locale';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { FileText, Search, Zap } from 'lucide-react';
 
+/**
+ * 메인 페이지 (랜딩 페이지)
+ *
+ * Constitution Principle VII: shadcn/ui 활용, 간단한 정적 콘텐츠
+ * Web UI Design Guide: 16px minimum text, 8px grid spacing
+ *
+ * 기능:
+ * - 프로젝트 소개
+ * - 주요 기능 안내
+ * - 게시판으로 이동 CTA
+ */
 export default function Home() {
-  const queryClient = useQueryClient();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchMode, setSearchMode] = useState<'all' | 'vector'>('all');
-  const [searchResults, setSearchResults] = useState<VectorSearchResult[]>([]);
-
-  // 새 게시글 입력 상태
-  const [newPost, setNewPost] = useState({
-    title: '',
-    content: '',
-    author: '',
-  });
-
-  // 모든 게시글 조회
-  const { data: posts = [], isLoading } = useQuery({
-    queryKey: ['posts'],
-    queryFn: postsApi.getAll,
-  });
-
-  // 게시글 생성
-  const createMutation = useMutation({
-    mutationFn: postsApi.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
-      setNewPost({ title: '', content: '', author: '' });
-    },
-  });
-
-  // 벡터 검색
-  const searchMutation = useMutation({
-    mutationFn: (query: string) => postsApi.searchByVector({ query, limit: 10 }),
-    onSuccess: (data) => {
-      setSearchResults(data);
-      setSearchMode('vector');
-    },
-  });
-
-  const handleCreatePost = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPost.title && newPost.content && newPost.author) {
-      createMutation.mutate(newPost);
-    }
-  };
-
-  const handleVectorSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      searchMutation.mutate(searchQuery);
-    }
-  };
-
-  const handleShowAllPosts = () => {
-    setSearchMode('all');
-    setSearchQuery('');
-    setSearchResults([]);
-  };
-
-  const displayPosts = searchMode === 'all' ? posts : searchResults.map(r => r.post);
-
   return (
-    <div className="space-y-8">
-      {/* 벡터 검색 섹션 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>벡터 검색</CardTitle>
-          <CardDescription>
-            의미 기반으로 관련 게시글을 검색합니다
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleVectorSearch} className="flex gap-2">
-            <Input
-              placeholder="검색어를 입력하세요..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1"
-            />
-            <Button type="submit" disabled={searchMutation.isPending}>
-              {searchMutation.isPending ? '검색 중...' : '검색'}
-            </Button>
-            {searchMode === 'vector' && (
-              <Button type="button" variant="outline" onClick={handleShowAllPosts}>
-                전체 보기
-              </Button>
-            )}
-          </form>
-          {searchMode === 'vector' && (
-            <p className="text-sm text-gray-500 mt-2">
-              검색 결과: {searchResults.length}개
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* 새 게시글 작성 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>새 게시글 작성</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleCreatePost} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">제목</Label>
-              <Input
-                id="title"
-                value={newPost.title}
-                onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                placeholder="제목을 입력하세요"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="content">내용</Label>
-              <Textarea
-                id="content"
-                value={newPost.content}
-                onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
-                placeholder="내용을 입력하세요"
-                rows={5}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="author">작성자</Label>
-              <Input
-                id="author"
-                value={newPost.author}
-                onChange={(e) => setNewPost({ ...newPost, author: e.target.value })}
-                placeholder="작성자명을 입력하세요"
-                required
-              />
-            </div>
-            <Button type="submit" disabled={createMutation.isPending}>
-              {createMutation.isPending ? '작성 중...' : '작성하기'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* 게시글 목록 */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">
-            {searchMode === 'all' ? '전체 게시글' : '검색 결과'}
-          </h2>
-          <span className="text-sm text-gray-500">
-            총 {displayPosts.length}개
-          </span>
-        </div>
-
-        {isLoading ? (
-          <div className="text-center py-8 text-gray-500">로딩 중...</div>
-        ) : displayPosts.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            {searchMode === 'vector' ? '검색 결과가 없습니다.' : '게시글이 없습니다.'}
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            {displayPosts.map((post, index) => {
-              const result = searchMode === 'vector' ? searchResults[index] : null;
-              return (
-                <Card key={post.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg">{post.title}</CardTitle>
-                        <CardDescription className="flex items-center gap-2 mt-1">
-                          <span>{post.author}</span>
-                          <span>•</span>
-                          <span>
-                            {formatDistance(new Date(post.createdAt), new Date(), {
-                              addSuffix: true,
-                              locale: ko,
-                            })}
-                          </span>
-                        </CardDescription>
-                      </div>
-                      {result && result.similarityScore !== null && (
-                        <div className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                          유사도: {(1 - result.similarityScore).toFixed(3)}
-                        </div>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-700 whitespace-pre-wrap">{post.content}</p>
-                    <div className="mt-3 flex items-center gap-2">
-                      {post.hasVector ? (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                          벡터 생성됨
-                        </span>
-                      ) : (
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                          벡터 미생성
-                        </span>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
+    <div className="max-w-4xl mx-auto space-y-8">
+      {/* 환영 메시지 */}
+      <div className="text-center space-y-4 py-12">
+        <h1 className="text-4xl font-bold tracking-tight">
+          벡터 검색 게시판에 오신 것을 환영합니다
+        </h1>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          PostgreSQL + pgvector를 활용한 의미 기반 검색 게시판입니다.
+          일반 키워드 검색을 넘어 문맥과 의미를 이해하는 스마트 검색을 경험해보세요.
+        </p>
       </div>
+
+      {/* 주요 기능 소개 */}
+      <div className="grid md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              <CardTitle>게시글 관리</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <CardDescription className="text-base">
+              Lexical 에디터를 활용한 마크다운 기반 게시글 작성 및 관리
+            </CardDescription>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Search className="w-5 h-5 text-primary" />
+              <CardTitle>의미 기반 검색</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <CardDescription className="text-base">
+              pgvector를 활용한 벡터 유사도 검색으로 관련 콘텐츠 발견
+            </CardDescription>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-primary" />
+              <CardTitle>실시간 처리</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <CardDescription className="text-base">
+              ONNX Runtime 기반 임베딩 생성으로 빠른 벡터화
+            </CardDescription>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* CTA 버튼 */}
+      <div className="flex flex-col items-center gap-4 py-8">
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <Button asChild size="lg" className="text-lg px-8 py-6">
+            <Link href="/posts">
+              게시판으로 이동
+            </Link>
+          </Button>
+          <Button asChild size="lg" variant="outline" className="text-lg px-8 py-6">
+            <Link href="/test-editor">
+              에디터 테스트
+            </Link>
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground text-center">
+          게시글을 작성하고 벡터 검색을 경험해보세요 · 로그인 없이 에디터를 테스트할 수 있습니다
+        </p>
+      </div>
+
+      {/* 기술 스택 정보 */}
+      <Card className="bg-muted/50">
+        <CardHeader>
+          <CardTitle className="text-base">기술 스택</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-4 text-sm text-muted-foreground">
+            <div>
+              <p className="font-semibold text-foreground mb-2">Frontend</p>
+              <ul className="space-y-1">
+                <li>• Next.js 15 (App Router, Turbopack)</li>
+                <li>• React 19 + React Compiler</li>
+                <li>• TanStack Query (서버 상태)</li>
+                <li>• shadcn/ui + Tailwind CSS</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground mb-2">Backend</p>
+              <ul className="space-y-1">
+                <li>• Spring Boot 3.2.1 (Kotlin)</li>
+                <li>• PostgreSQL 18 + pgvector</li>
+                <li>• ONNX Runtime (multilingual-e5-base)</li>
+                <li>• QueryDSL + MyBatis</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

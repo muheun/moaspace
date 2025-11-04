@@ -7,153 +7,205 @@
 
 'use client';
 
-import { useCallback, useEffect } from 'react';
-import { LexicalComposer } from '@lexical/react/LexicalComposer';
-import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
-import { ContentEditable } from '@lexical/react/LexicalContentEditable';
-import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
-import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin';
-import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary';
-import { HeadingNode, QuoteNode } from '@lexical/rich-text';
-import { ListNode, ListItemNode } from '@lexical/list';
-import { CodeNode } from '@lexical/code';
-import { LinkNode } from '@lexical/link';
-import { EditorState, $getRoot } from 'lexical';
-import { $generateHtmlFromNodes } from '@lexical/html';
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { MarkdownShortcutPlugin } from './plugins/MarkdownShortcutPlugin';
+import { $getRoot } from 'lexical'
+import { useEffect, useState } from 'react'
+import './styles/editor.css'
+
+import { LexicalComposer } from '@lexical/react/LexicalComposer'
+import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
+import { ContentEditable } from '@lexical/react/LexicalContentEditable'
+import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
+import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin'
+import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
+import { HeadingNode, QuoteNode } from '@lexical/rich-text'
+import { TableCellNode, TableNode, TableRowNode } from '@lexical/table'
+import { ListItemNode, ListNode } from '@lexical/list'
+import { CodeHighlightNode, CodeNode } from '@lexical/code'
+import { AutoLinkNode, LinkNode } from '@lexical/link'
+import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin'
+import { ListPlugin } from '@lexical/react/LexicalListPlugin'
+import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin'
+import { TRANSFORMERS } from '@lexical/markdown'
+
+import ToolbarPlugin from './plugins/ToolbarPlugin'
+import AutoLinkPlugin from './plugins/AutoLinkPlugin'
+import CodeHighlightPlugin from './plugins/CodeHighlightPlugin'
+import ListMaxIndentLevelPlugin from './plugins/ListMaxIndentLevelPlugin'
+import ExampleTheme from './themes/ExampleTheme'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { $generateHtmlFromNodes, $generateNodesFromDOM } from '@lexical/html'
+import { $insertNodes, $createParagraphNode, $createTextNode } from 'lexical'
+
+function Placeholder() {
+  return (
+    <div className="absolute top-4 left-4 text-gray-400 pointer-events-none select-none">
+      게시글을 작성하세요...
+    </div>
+  )
+}
 
 interface LexicalEditorProps {
   /**
    * 초기 HTML 콘텐츠 (수정 시 사용)
    */
-  initialContent?: string;
+  initialContent?: string
 
   /**
    * 에디터 내용 변경 시 호출
    * @param html - HTML 포맷 (content 필드에 저장)
    * @param plainText - Plain Text (plainContent 필드에 저장, 벡터화 대상)
    */
-  onChange: (html: string, plainText: string) => void;
+  onChange: (html: string, plainText: string) => void
 
   /**
    * placeholder 텍스트
    */
-  placeholder?: string;
+  placeholder?: string
 
   /**
    * 에디터 비활성화 여부
    */
-  disabled?: boolean;
+  disabled?: boolean
 }
 
-/**
- * Lexical 에디터 설정
- */
-const editorConfig = {
-  namespace: 'PostEditor',
-  theme: {
-    paragraph: 'mb-2',
-    heading: {
-      h1: 'text-3xl font-bold mb-4',
-      h2: 'text-2xl font-bold mb-3',
-      h3: 'text-xl font-bold mb-2',
+// 에디터 설정
+function createEditorConfig() {
+  return {
+    namespace: 'PostEditor',
+    theme: ExampleTheme,
+    onError(error: Error) {
+      console.error('[LexicalEditor] Error:', error)
     },
-    list: {
-      ul: 'list-disc ml-4',
-      ol: 'list-decimal ml-4',
-      listitem: 'mb-1',
-    },
-    quote: 'border-l-4 border-gray-300 pl-4 italic my-4',
-    code: 'bg-gray-100 px-1 py-0.5 rounded font-mono text-sm',
-  },
-  nodes: [
-    HeadingNode,
-    QuoteNode,
-    ListNode,
-    ListItemNode,
-    CodeNode,
-    LinkNode,
-  ],
-  onError: (error: Error) => {
-    console.error('[LexicalEditor] Error:', error);
-  },
-};
+    nodes: [
+      HeadingNode,
+      ListNode,
+      ListItemNode,
+      QuoteNode,
+      CodeNode,
+      CodeHighlightNode,
+      TableNode,
+      TableCellNode,
+      TableRowNode,
+      AutoLinkNode,
+      LinkNode
+    ],
+    editorState: undefined
+  }
+}
+
+// 초기값 설정 플러그인
+function InitialValuePlugin({ initialContent }: { initialContent?: string }) {
+  const [editor] = useLexicalComposerContext()
+  const [isFirst, setIsFirst] = useState(true)
+
+  useEffect(() => {
+    if (!initialContent || !isFirst) return
+
+    editor.update(() => {
+      const root = $getRoot()
+      root.clear()
+
+      if (initialContent.trim().startsWith('<')) {
+        try {
+          const parser = new DOMParser()
+          const dom = parser.parseFromString(initialContent, 'text/html')
+          const nodes = $generateNodesFromDOM(editor, dom)
+
+          if (nodes.length > 0) {
+            $insertNodes(nodes)
+          } else {
+            const paragraph = $createParagraphNode()
+            paragraph.append($createTextNode(initialContent))
+            root.append(paragraph)
+          }
+        } catch (error) {
+          console.error('[LexicalEditor] Failed to parse HTML:', error)
+          const paragraph = $createParagraphNode()
+          paragraph.append($createTextNode(initialContent))
+          root.append(paragraph)
+        }
+      } else {
+        const paragraph = $createParagraphNode()
+        paragraph.append($createTextNode(initialContent))
+        root.append(paragraph)
+      }
+    })
+
+    setIsFirst(false)
+  }, [editor, initialContent, isFirst])
+
+  return null
+}
+
+// 에디터 상태 변경 핸들러 컴포넌트
+function EditorChangeHandler({ onChange }: { onChange?: (html: string, plainText: string) => void }) {
+  const [editor] = useLexicalComposerContext()
+
+  useEffect(() => {
+    if (!onChange) return
+
+    return editor.registerUpdateListener(({ editorState }) => {
+      editorState.read(() => {
+        // HTML 생성
+        const html = $generateHtmlFromNodes(editor)
+
+        // Plain Text 추출
+        const root = $getRoot()
+        const plainText = root.getTextContent()
+
+        onChange(html, plainText)
+      })
+    })
+  }, [editor, onChange])
+
+  return null
+}
 
 export function LexicalEditor({
   initialContent,
   onChange,
-  placeholder = '게시글을 작성하세요...',
-  disabled = false,
+  placeholder,
+  disabled = false
 }: LexicalEditorProps) {
-  /**
-   * 에디터 상태 변경 시 HTML + Plain Text 추출
-   */
-  const handleChange = useCallback(
-    (editorState: EditorState) => {
-      editorState.read(() => {
-        // HTML 추출 (content 필드)
-        const html = $generateHtmlFromNodes(null);
-
-        // Plain Text 추출 (plainContent 필드, 벡터화 대상)
-        const root = $getRoot();
-        const plainText = root.getTextContent();
-
-        onChange(html, plainText);
-      });
-    },
-    [onChange]
-  );
+  const editorConfig = createEditorConfig()
 
   return (
     <LexicalComposer initialConfig={editorConfig}>
-      <div className="relative rounded-md border border-input bg-background">
-        <RichTextPlugin
-          contentEditable={
-            <ContentEditable
-              className="min-h-[200px] px-4 py-3 outline-none prose prose-sm max-w-none"
-              aria-label="게시글 에디터"
-              disabled={disabled}
-            />
-          }
-          placeholder={
-            <div className="absolute top-3 left-4 text-muted-foreground pointer-events-none">
-              {placeholder}
-            </div>
-          }
-          ErrorBoundary={LexicalErrorBoundary}
-        />
-        <HistoryPlugin />
-        <OnChangePlugin onChange={handleChange} />
-        <MarkdownShortcutPlugin />
-        {initialContent && <InitialContentPlugin initialContent={initialContent} />}
+      <div className="relative w-full">
+        {/* 툴바 */}
+        <ToolbarPlugin />
+
+        {/* 에디터 본문 */}
+        <div className="relative min-h-[400px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-b-lg">
+          <RichTextPlugin
+            contentEditable={
+              <ContentEditable
+                className="min-h-[400px] px-4 py-4 outline-none resize-none text-gray-900 dark:text-white bg-white dark:bg-gray-800"
+                aria-label="게시글 에디터"
+                disabled={disabled}
+              />
+            }
+            placeholder={placeholder ? <div className="absolute top-4 left-4 text-gray-400 pointer-events-none select-none">{placeholder}</div> : <Placeholder />}
+            ErrorBoundary={LexicalErrorBoundary}
+          />
+
+          {/* 플러그인들 */}
+          <HistoryPlugin />
+          <AutoFocusPlugin />
+          <CodeHighlightPlugin />
+          <ListPlugin />
+          <LinkPlugin />
+          <AutoLinkPlugin />
+          <ListMaxIndentLevelPlugin maxDepth={7} />
+          <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+
+          {/* 초기값 설정 */}
+          {initialContent && <InitialValuePlugin initialContent={initialContent} />}
+
+          {/* 변경사항 핸들러 */}
+          {onChange && <EditorChangeHandler onChange={onChange} />}
+        </div>
       </div>
     </LexicalComposer>
-  );
-}
-
-/**
- * 초기 콘텐츠 로드 플러그인
- */
-function InitialContentPlugin({ initialContent }: { initialContent: string }) {
-  const [editor] = useLexicalComposerContext();
-
-  useEffect(() => {
-    if (initialContent && editor) {
-      editor.update(() => {
-        const root = $getRoot();
-        root.clear();
-
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = initialContent;
-
-        root.append(...Array.from(tempDiv.childNodes).map(node => {
-          const textNode = node.textContent || '';
-          return $getRoot().createTextNode(textNode);
-        }));
-      });
-    }
-  }, [editor, initialContent]);
-
-  return null;
+  )
 }

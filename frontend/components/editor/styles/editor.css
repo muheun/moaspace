@@ -1,0 +1,119 @@
+/**
+ * 에디터 커스텀 스타일
+ */
+
+/* 툴바 기본 스타일 */
+.toolbar {
+  @apply flex items-center gap-1 p-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-t-lg flex-wrap;
+}
+
+.toolbar-item {
+  @apply border-0 flex bg-transparent rounded-[10px] cursor-pointer items-center justify-center;
+}
+
+.toolbar-item:hover:not(:disabled) {
+  @apply bg-gray-200 dark:bg-gray-700;
+}
+
+.toolbar-item:disabled {
+  @apply opacity-30 cursor-not-allowed;
+}
+
+.toolbar-item.active {
+  @apply bg-gray-200 dark:bg-gray-700;
+}
+
+/* 툴바 구분선 */
+.divider {
+  @apply w-px bg-gray-300 dark:bg-gray-600 mx-1 h-5 self-center;
+}
+
+/* 링크 에디터 스타일 */
+.link-editor {
+  @apply absolute z-[100] max-w-[300px] w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg transition-opacity;
+  top: -10000px;
+  left: -10000px;
+  opacity: 0;
+}
+
+.link-input {
+  @apply block w-[calc(100%-24px)] box-border m-2 p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm text-gray-900 dark:text-white border-0 outline-0;
+}
+
+.link-input a {
+  @apply text-blue-600 dark:text-blue-400 underline whitespace-nowrap overflow-hidden mr-8 overflow-ellipsis;
+}
+
+.link-input a:hover {
+  @apply underline;
+}
+
+.link-edit {
+  @apply w-9 absolute right-0 top-0 bottom-0 cursor-pointer bg-no-repeat bg-center;
+  background-size: 16px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'/%3E%3C/svg%3E");
+}
+
+.dark .link-edit {
+  filter: invert(1);
+}
+
+/* 에디터 본문 스타일 */
+.editor-input {
+  @apply min-h-[150px] text-[15px] relative outline-0 p-4 resize-none;
+  tab-size: 1;
+  caret-color: #444;
+}
+
+.dark .editor-input {
+  caret-color: #aaa;
+}
+
+/* Placeholder 스타일 */
+.editor-placeholder {
+  @apply text-gray-400 dark:text-gray-500 overflow-hidden absolute text-ellipsis select-none pointer-events-none inline-block;
+  top: 15px;
+  left: 10px;
+  font-size: 15px;
+}
+
+/* 텍스트 포맷 스타일 */
+.editor-text-bold {
+  font-weight: bold;
+}
+
+.editor-text-italic {
+  font-style: italic;
+}
+
+.editor-text-underline {
+  text-decoration: underline;
+}
+
+.editor-text-strikethrough {
+  text-decoration: line-through;
+}
+
+.editor-text-underlineStrikethrough {
+  text-decoration: underline line-through;
+}
+
+.editor-text-code {
+  @apply bg-gray-100 dark:bg-gray-700 px-1 py-0.5 font-mono text-sm;
+}
+
+/* 링크 스타일 */
+.editor-link {
+  @apply text-blue-600 dark:text-blue-400 no-underline;
+}
+
+.editor-link:hover {
+  @apply underline;
+}
+
+/* 코드 블록 스타일 */
+.editor-code {
+  @apply bg-gray-100 dark:bg-gray-900 font-mono block p-2 my-2 text-sm overflow-x-auto;
+  line-height: 1.53;
+  tab-size: 2;
+}

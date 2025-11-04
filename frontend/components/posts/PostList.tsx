@@ -14,11 +14,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { PostSummary } from '@/types/api/post';
-import { getPostById } from '@/lib/api/posts';
+import type { PostDto } from '@/types/api/post';
+import { postsApi } from '@/lib/api/posts';
 
 interface PostListProps {
-  posts: PostSummary[];
+  posts: PostDto[];
   isLoading?: boolean;
 }
 
@@ -38,7 +38,7 @@ export function PostList({ posts, isLoading = false }: PostListProps) {
   const handlePrefetch = (postId: number) => {
     queryClient.prefetchQuery({
       queryKey: ['post', postId],
-      queryFn: () => getPostById(postId),
+      queryFn: () => postsApi.getPostById(postId),
       staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
     });
   };
@@ -105,10 +105,9 @@ export function PostList({ posts, isLoading = false }: PostListProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground line-clamp-2">{post.excerpt}</p>
                 {post.hashtags.length > 0 && (
                   <div className="flex gap-2 mt-4 flex-wrap" aria-label="해시태그">
-                    {post.hashtags.map((hashtag) => (
+                    {post.hashtags.map((hashtag: string) => (
                       <Badge key={hashtag} variant="secondary">
                         #{hashtag}
                       </Badge>

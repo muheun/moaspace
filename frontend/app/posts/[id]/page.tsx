@@ -60,7 +60,7 @@ export default function PostDetailPage({
         toast.success('게시글이 삭제되었습니다');
         router.push('/posts');
       },
-      onError: (error: any) => {
+      onError: (error) => {
         // 에러 처리 (권한 없음, 네트워크 오류 등)
         toast.error(error instanceof Error ? error.message : '게시글 삭제에 실패했습니다');
         setDeleteDialogOpen(false);
@@ -186,7 +186,7 @@ export default function PostDetailPage({
 
           <section
             className="prose prose-lg max-w-none"
-            dangerouslySetInnerHTML={{ __html: post.content }}
+            dangerouslySetInnerHTML={{ __html: post.contentHtml }}
             aria-label="게시글 내용"
           />
         </article>
