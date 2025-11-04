@@ -18,7 +18,7 @@ data class PostResponse(
     val author: AuthorInfo,
     val hashtags: List<String>,
     val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime
+    val updatedAt: LocalDateTime?
 ) {
     companion object {
         fun from(post: Post): PostResponse {

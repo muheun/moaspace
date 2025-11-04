@@ -7,14 +7,29 @@ const apiClient = axios.create({
   },
 });
 
-// JWT 인터셉터 (Request)
+// JWT 인터셉터 (Request) + Cookie 동기화
 apiClient.interceptors.request.use(
   (config) => {
     // localStorage에서 JWT 토큰 가져오기
     const token = localStorage.getItem('access_token');
 
     if (token) {
+      // 1. Authorization 헤더 설정 (API 요청용)
       config.headers.Authorization = `Bearer ${token}`;
+
+      // 2. Cookie 동기화 (Middleware 인증용)
+      // 브라우저에서 Cookie가 없거나 만료된 경우 자동으로 재설정
+      if (typeof document !== 'undefined') {
+        const cookieValue = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('access_token='))
+          ?.split('=')[1];
+
+        // Cookie가 없거나 localStorage와 다른 경우 동기화
+        if (!cookieValue || cookieValue !== token) {
+          document.cookie = `access_token=${token}; path=/; max-age=${60*60*24*7}; SameSite=Lax`;
+        }
+      }
     }
 
     return config;
@@ -29,12 +44,21 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // JWT 만료 시 로그인 페이지로 리다이렉션
-      localStorage.removeItem('access_token');
+      // /api/auth/me는 선택적 인증 (401을 조용히 처리)
+      const isAuthCheck = error.config?.url?.includes('/api/auth/me');
 
-      // 현재 페이지가 로그인 페이지가 아닐 경우에만 리다이렉션
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      if (!isAuthCheck) {
+        // JWT 만료 시 localStorage와 Cookie 모두 제거
+        localStorage.removeItem('access_token');
+
+        if (typeof document !== 'undefined') {
+          document.cookie = 'access_token=; path=/; max-age=0; SameSite=Lax';
+        }
+
+        // 현재 페이지가 로그인 페이지가 아닐 경우에만 리다이렉션
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
       }
     }
 

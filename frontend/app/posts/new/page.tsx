@@ -35,22 +35,13 @@ export default function NewPostPage() {
   const { mutate: createPost, isPending, error } = useCreatePost();
 
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [plainContent, setPlainContent] = useState('');
+  const [contentHtml, setContentHtml] = useState('');
   const [hashtags, setHashtags] = useState('');
 
-  /**
-   * Lexical 에디터 내용 변경 시 호출
-   * HTML과 Plain Text를 동시에 받아 상태 업데이트
-   */
-  const handleEditorChange = (html: string, plainText: string) => {
-    setContent(html);
-    setPlainContent(plainText);
+  const handleEditorChange = (html: string, _text: string) => {
+    setContentHtml(html);
   };
 
-  /**
-   * 게시글 작성 제출
-   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -59,12 +50,11 @@ export default function NewPostPage() {
       return;
     }
 
-    if (!plainContent.trim()) {
+    if (!contentHtml.trim()) {
       toast.error('내용을 입력하세요');
       return;
     }
 
-    // 해시태그 파싱 (공백 또는 쉼표로 구분)
     const hashtagArray = hashtags
       .split(/[\s,]+/)
       .filter((tag) => tag.trim().length > 0)
@@ -73,9 +63,7 @@ export default function NewPostPage() {
     createPost(
       {
         title: title.trim(),
-        contentMarkdown: content,
-        contentHtml: content,
-        contentText: plainContent.trim(),
+        contentHtml: contentHtml,
         hashtags: hashtagArray,
       },
       {
@@ -174,7 +162,7 @@ export default function NewPostPage() {
             </Button>
             <Button
               type="submit"
-              disabled={isPending || !title.trim() || !plainContent.trim()}
+              disabled={isPending || !title.trim() || !contentHtml.trim()}
               aria-label="게시글 작성"
             >
               {isPending ? '작성 중...' : '작성하기'}

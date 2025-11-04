@@ -9,7 +9,7 @@ export interface PostDto {
   author: AuthorInfo;
   hashtags: string[];
   createdAt: string;  // ISO 8601
-  updatedAt: string;  // ISO 8601
+  updatedAt?: string;  // ISO 8601, 수정이 없으면 null
 }
 
 export interface AuthorInfo {

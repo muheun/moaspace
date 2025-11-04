@@ -7,14 +7,14 @@ import type { EditorThemeClasses } from 'lexical'
 
 const ExampleTheme: EditorThemeClasses = {
   // 블록 레벨 요소들
-  paragraph: 'mb-2 leading-relaxed',
+  paragraph: 'mb-1 leading-tight',
   quote: 'my-2 ml-5 pl-4 border-l-4 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 italic',
   heading: {
-    h1: 'text-3xl font-bold mb-4 text-gray-900 dark:text-white',
-    h2: 'text-2xl font-semibold mb-3 text-gray-800 dark:text-gray-100',
+    h1: 'text-[2em] font-bold mb-4 pb-2 text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700',
+    h2: 'text-2xl font-semibold mb-3 pb-2 text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700',
     h3: 'text-xl font-medium mb-2 text-gray-800 dark:text-gray-100',
-    h4: 'text-lg font-medium mb-2 text-gray-800 dark:text-gray-100',
-    h5: 'text-base font-medium mb-2 text-gray-800 dark:text-gray-100'
+    h4: 'text-base font-medium mb-2 text-gray-800 dark:text-gray-100',
+    h5: 'text-sm font-medium mb-2 text-gray-800 dark:text-gray-100'
   },
 
   // 리스트

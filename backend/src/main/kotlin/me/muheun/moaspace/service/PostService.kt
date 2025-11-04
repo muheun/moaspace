@@ -5,6 +5,9 @@ import me.muheun.moaspace.dto.CreatePostRequest
 import me.muheun.moaspace.dto.UpdatePostRequest
 import me.muheun.moaspace.repository.PostRepository
 import me.muheun.moaspace.repository.UserRepository
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
+import org.jsoup.nodes.TextNode
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -47,18 +50,18 @@ class PostService(
         // XSS 방어: Hashtags sanitize
         val sanitizedHashtags = request.hashtags.map { sanitizeHashtag(it) }.toTypedArray()
 
-        // Markdown → HTML 파싱
-        val contentHtml = parseMarkdown(request.contentMarkdown)
+        // Lexical에서 생성한 HTML을 그대로 사용
+        val sanitizedHtml = sanitizeHtml(request.contentHtml)
 
-        // HTML Sanitize (허용된 태그만)
-        val sanitizedHtml = sanitizeHtml(contentHtml)
+        // HTML → Markdown 변환 (서버 측 변환, 수정 페이지용)
+        val contentMarkdown = convertHtmlToMarkdown(sanitizedHtml)
 
         // HTML → PlainText 추출 (벡터화용)
         val contentText = extractPlainText(sanitizedHtml)
 
         val post = Post(
             title = sanitizedTitle,
-            contentMarkdown = request.contentMarkdown,
+            contentMarkdown = contentMarkdown,
             contentHtml = sanitizedHtml,
             contentText = contentText,
             author = author,
@@ -89,13 +92,84 @@ class PostService(
     }
 
     /**
-     * Markdown → HTML 파싱
+     * HTML → Markdown 변환 (간단한 구현, 수정 페이지용)
+     * jsoup을 사용하여 HTML을 기본적인 Markdown으로 변환합니다.
      */
-    private fun parseMarkdown(markdown: String): String {
-        val parser = com.vladsch.flexmark.parser.Parser.builder().build()
-        val renderer = com.vladsch.flexmark.html.HtmlRenderer.builder().build()
-        val document = parser.parse(markdown)
-        return renderer.render(document)
+    private fun convertHtmlToMarkdown(html: String): String {
+        if (html.isBlank()) return ""
+
+        val doc = Jsoup.parse(html)
+        val markdown = StringBuilder()
+
+        fun processNode(element: Element, prefix: String = "") {
+            for (node in element.childNodes()) {
+                when (node) {
+                    is TextNode -> {
+                        val text = node.text().trim()
+                        if (text.isNotEmpty()) {
+                            markdown.append(prefix).append(text)
+                        }
+                    }
+                    is Element -> {
+                        when (node.tagName()) {
+                            "h1" -> markdown.append("\n# ").append(node.text()).append("\n\n")
+                            "h2" -> markdown.append("\n## ").append(node.text()).append("\n\n")
+                            "h3" -> markdown.append("\n### ").append(node.text()).append("\n\n")
+                            "h4" -> markdown.append("\n#### ").append(node.text()).append("\n\n")
+                            "h5" -> markdown.append("\n##### ").append(node.text()).append("\n\n")
+                            "h6" -> markdown.append("\n###### ").append(node.text()).append("\n\n")
+                            "p" -> {
+                                processNode(node, "")
+                                markdown.append("\n\n")
+                            }
+                            "br" -> markdown.append("\n")
+                            "strong", "b" -> markdown.append("**").append(node.text()).append("**")
+                            "em", "i" -> markdown.append("*").append(node.text()).append("*")
+                            "code" -> markdown.append("`").append(node.text()).append("`")
+                            "pre" -> {
+                                val codeElement = node.selectFirst("code")
+                                if (codeElement != null) {
+                                    markdown.append("\n```\n").append(codeElement.text()).append("\n```\n\n")
+                                } else {
+                                    markdown.append("\n```\n").append(node.text()).append("\n```\n\n")
+                                }
+                            }
+                            "blockquote" -> {
+                                markdown.append("\n> ").append(node.text()).append("\n\n")
+                            }
+                            "ul" -> {
+                                for (li in node.select("li")) {
+                                    markdown.append("- ").append(li.text()).append("\n")
+                                }
+                                markdown.append("\n")
+                            }
+                            "ol" -> {
+                                var index = 1
+                                for (li in node.select("li")) {
+                                    markdown.append("${index}. ").append(li.text()).append("\n")
+                                    index++
+                                }
+                                markdown.append("\n")
+                            }
+                            "a" -> {
+                                val href = node.attr("href")
+                                markdown.append("[").append(node.text()).append("](").append(href).append(")")
+                            }
+                            "img" -> {
+                                val src = node.attr("src")
+                                val alt = node.attr("alt")
+                                markdown.append("![").append(alt).append("](").append(src).append(")")
+                            }
+                            "hr" -> markdown.append("\n---\n\n")
+                            else -> processNode(node, prefix)
+                        }
+                    }
+                }
+            }
+        }
+
+        processNode(doc.body())
+        return markdown.toString().trim()
     }
 
     /**
@@ -183,17 +257,17 @@ class PostService(
         // XSS 방어: Hashtags sanitize
         val sanitizedHashtags = request.hashtags.map { sanitizeHashtag(it) }.toTypedArray()
 
-        // Markdown → HTML 파싱
-        val contentHtml = parseMarkdown(request.contentMarkdown)
+        // Lexical에서 생성한 HTML을 그대로 사용
+        val sanitizedHtml = sanitizeHtml(request.contentHtml)
 
-        // HTML Sanitize
-        val sanitizedHtml = sanitizeHtml(contentHtml)
+        // HTML → Markdown 변환 (서버 측 변환, 수정 페이지용)
+        val contentMarkdown = convertHtmlToMarkdown(sanitizedHtml)
 
         // HTML → PlainText 추출
         val contentText = extractPlainText(sanitizedHtml)
 
         post.title = sanitizedTitle
-        post.contentMarkdown = request.contentMarkdown
+        post.contentMarkdown = contentMarkdown
         post.contentHtml = sanitizedHtml
         post.contentText = contentText
         post.hashtags = sanitizedHashtags

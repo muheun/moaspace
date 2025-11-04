@@ -25,7 +25,7 @@ import { AutoLinkNode, LinkNode } from '@lexical/link'
 import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin'
 import { ListPlugin } from '@lexical/react/LexicalListPlugin'
 import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin'
-import { TRANSFORMERS } from '@lexical/markdown'
+import { TRANSFORMERS, $convertToMarkdownString } from '@lexical/markdown'
 
 import ToolbarPlugin from './plugins/ToolbarPlugin'
 import AutoLinkPlugin from './plugins/AutoLinkPlugin'
@@ -52,10 +52,10 @@ interface LexicalEditorProps {
 
   /**
    * 에디터 내용 변경 시 호출
-   * @param html - HTML 포맷 (content 필드에 저장)
-   * @param plainText - Plain Text (plainContent 필드에 저장, 벡터화 대상)
+   * @param html - HTML 포맷 (contentHtml 필드에 저장)
+   * @param text - Plain Text (contentText 필드에 저장, 벡터화 대상)
    */
-  onChange: (html: string, plainText: string) => void
+  onChange: (html: string, text: string) => void
 
   /**
    * placeholder 텍스트
@@ -138,7 +138,7 @@ function InitialValuePlugin({ initialContent }: { initialContent?: string }) {
 }
 
 // 에디터 상태 변경 핸들러 컴포넌트
-function EditorChangeHandler({ onChange }: { onChange?: (html: string, plainText: string) => void }) {
+function EditorChangeHandler({ onChange }: { onChange?: (html: string, text: string) => void }) {
   const [editor] = useLexicalComposerContext()
 
   useEffect(() => {
@@ -151,9 +151,9 @@ function EditorChangeHandler({ onChange }: { onChange?: (html: string, plainText
 
         // Plain Text 추출
         const root = $getRoot()
-        const plainText = root.getTextContent()
+        const text = root.getTextContent()
 
-        onChange(html, plainText)
+        onChange(html, text)
       })
     })
   }, [editor, onChange])

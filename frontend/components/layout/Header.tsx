@@ -28,9 +28,12 @@ export function Header() {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Header는 항상 useAuth 호출 (모든 페이지에서 로그인 상태 표시 필요)
-  // enabled: false로 설정하면 안됨 - 로그인 상태를 보여줄 수 없음
-  const { data: user, isLoading } = useAuth();
+  // 공개 페이지 목록 (인증 체크 안 함)
+  const publicPaths = ['/login', '/callback', '/test-editor'];
+  const isPublicPage = publicPaths.includes(pathname);
+
+  // 공개 페이지에서는 useAuth 호출 안 함 (401 에러 방지)
+  const { data: user, isLoading } = useAuth(!isPublicPage);
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
 
   /**

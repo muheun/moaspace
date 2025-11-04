@@ -39,7 +39,7 @@ data class PostSummary(
     val author: AuthorInfo,
     val hashtags: List<String>,
     val createdAt: java.time.LocalDateTime,
-    val updatedAt: java.time.LocalDateTime
+    val updatedAt: java.time.LocalDateTime?
 ) {
     companion object {
         fun from(post: Post): PostSummary {

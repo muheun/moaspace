@@ -1,7 +1,8 @@
 'use client';
 
-import { use, useEffect, useTransition } from 'react';
+import { use, useEffect } from 'react';
 import { redirect, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { setAuthCookie } from './actions';
 
@@ -30,9 +31,9 @@ export default function CallbackPage({
   searchParams: Promise<{ token?: string; error?: string; message?: string }>
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   // React 19: use() API로 searchParams 읽기
   const params = use(searchParams);
-  const [, startTransition] = useTransition();
 
   useEffect(() => {
     const { token, error, message } = params;
@@ -51,16 +52,21 @@ export default function CallbackPage({
       return;
     }
 
-    // React 19: useTransition으로 Server Action 호출
-    startTransition(async () => {
-      // JWT 토큰 저장 (localStorage + Cookie)
+    // 로그인 처리 (동기식)
+    (async () => {
+      // JWT 토큰 저장 (localStorage + Cookie 동기 설정)
       localStorage.setItem('access_token', token);
-      await setAuthCookie(token);
 
-      // 홈 페이지로 리다이렉트
-      router.push('/');
-    });
-  }, [params, router]);
+      // Cookie 동기 설정 (클라이언트 사이드)
+      document.cookie = `access_token=${token}; path=/; max-age=${60*60*24*7}; SameSite=Lax`;
+
+      // TanStack Query 캐시에 사용자 정보 로드 (완료 대기)
+      await queryClient.refetchQueries({ queryKey: ['auth', 'me'] });
+
+      // 홈 페이지로 리다이렉트 (window.location.href로 강제 새로고침)
+      window.location.href = '/';
+    })();
+  }, [params, router, queryClient]);
 
   // 에러 메시지가 있으면 에러 화면 표시
   if (params.error) {

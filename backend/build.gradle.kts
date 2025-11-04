@@ -78,8 +78,12 @@ dependencies {
     implementation("org.flywaydb:flyway-core:11.15.0")
     implementation("org.flywaydb:flyway-database-postgresql:11.15.0")
 
-    // Markdown 처리
-    implementation("com.vladsch.flexmark:flexmark-all:0.64.8")
+    // HTML Sanitization & Markdown Parser
+    implementation("org.jsoup:jsoup:1.17.2")
+    implementation("org.commonmark:commonmark:0.21.0")
+    implementation("org.commonmark:commonmark-ext-gfm-tables:0.21.0")
+    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.21.0")
+    implementation("org.commonmark:commonmark-ext-autolink:0.21.0")
 
     // HTML Sanitizer (XSS 방어)
     implementation("com.googlecode.owasp-java-html-sanitizer:owasp-java-html-sanitizer:20220608.1")

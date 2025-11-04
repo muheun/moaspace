@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { usePost, useUpdatePost } from '@/lib/hooks/usePosts';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { marked } from 'marked';
 
 /**
  * T094: Lexical 에디터 지연 로딩 최적화
@@ -45,19 +46,36 @@ export default function EditPostPage({
   const { mutate: updatePost, isPending, error } = useUpdatePost();
 
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [plainContent, setPlainContent] = useState('');
+  const [contentHtml, setContentHtml] = useState('');
   const [hashtags, setHashtags] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
 
   /**
    * 게시글 데이터 로드 후 폼 초기화
+   * 참조 프로젝트 패턴: HTML을 에디터 초기값으로 사용 (포맷 적용된 상태로 표시)
+   *
+   * 중요: Lexical은 HTML만 파싱 가능!
+   * - contentHtml 있음 → 그대로 사용
+   * - contentHtml 없고 contentMarkdown 있음 → Markdown을 HTML로 변환
+   * - 둘 다 없음 → contentText를 HTML로 래핑
    */
   useEffect(() => {
     if (post && !isInitialized) {
       setTitle(post.title);
-      setContent(post.contentHtml);
       setHashtags(post.hashtags.join(', '));
+
+      // HTML 우선, 없으면 Markdown을 HTML로 변환
+      if (post.contentHtml) {
+        setContentHtml(post.contentHtml);
+      } else if (post.contentMarkdown) {
+        // Markdown → HTML 변환 (Lexical이 파싱할 수 있도록)
+        const html = marked.parse(post.contentMarkdown, { async: false }) as string;
+        setContentHtml(html);
+      } else {
+        // Plain text를 HTML로 래핑
+        setContentHtml(`<p>${post.contentText}</p>`);
+      }
+
       setIsInitialized(true);
     }
   }, [post, isInitialized]);
@@ -65,9 +83,8 @@ export default function EditPostPage({
   /**
    * Lexical 에디터 내용 변경 시 호출
    */
-  const handleEditorChange = (html: string, plainText: string) => {
-    setContent(html);
-    setPlainContent(plainText);
+  const handleEditorChange = (html: string, _text: string) => {
+    setContentHtml(html);
   };
 
   /**
@@ -92,7 +109,7 @@ export default function EditPostPage({
       return;
     }
 
-    if (!plainContent.trim()) {
+    if (!contentHtml.trim()) {
       toast.error('내용을 입력하세요');
       return;
     }
@@ -107,9 +124,7 @@ export default function EditPostPage({
         id: postId,
         request: {
           title: title.trim(),
-          contentMarkdown: content, // TODO: Lexical에서 마크다운 직접 생성 필요
-          contentHtml: content,
-          contentText: plainContent.trim(),
+          contentHtml: contentHtml,
           hashtags: hashtagArray,
         },
       },
@@ -241,7 +256,7 @@ export default function EditPostPage({
             내용 <span className="text-red-500">*</span>
           </label>
           <LexicalEditor
-            initialContent={content}
+            initialContent={contentHtml}
             onChange={handleEditorChange}
             placeholder="게시글 내용을 작성하세요. 마크다운 문법을 지원합니다."
             disabled={isPending}
@@ -293,7 +308,7 @@ export default function EditPostPage({
           </Button>
           <Button
             type="submit"
-            disabled={isPending || !title.trim() || !plainContent.trim()}
+            disabled={isPending || !title.trim() || !contentHtml.trim()}
             aria-label="게시글 수정"
           >
             {isPending ? '수정 중...' : '수정하기'}

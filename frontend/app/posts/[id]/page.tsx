@@ -10,6 +10,7 @@ import { usePost, useDeletePost } from '@/lib/hooks/usePosts';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { DeleteConfirmDialog } from '@/components/posts/DeleteConfirmDialog';
 import { format } from 'date-fns';
+import MarkdownViewer from '@/components/ui/MarkdownViewer';
 
 /**
  * 게시글 상세 페이지
@@ -142,7 +143,7 @@ export default function PostDetailPage({
                   <p className="font-semibold">{post.author.name}</p>
                   <p className="text-sm text-gray-500">
                     {format(new Date(post.createdAt), 'yyyy년 MM월 dd일 HH:mm')}
-                    {post.createdAt !== post.updatedAt && ' (수정됨)'}
+                    {post.updatedAt && ' (수정됨)'}
                   </p>
                 </div>
               </div>
@@ -184,11 +185,17 @@ export default function PostDetailPage({
             )}
           </header>
 
-          <section
-            className="prose prose-lg max-w-none"
-            dangerouslySetInnerHTML={{ __html: post.contentHtml }}
-            aria-label="게시글 내용"
-          />
+          <section className="mt-8">
+            {post.contentMarkdown ? (
+              <MarkdownViewer content={post.contentMarkdown} />
+            ) : post.contentHtml ? (
+              <div className="editor-input">
+                <div dangerouslySetInnerHTML={{ __html: post.contentHtml }} />
+              </div>
+            ) : (
+              <div className="whitespace-pre-wrap">{post.contentText}</div>
+            )}
+          </section>
         </article>
 
         <footer className="mt-12 pt-6 border-t">

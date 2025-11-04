@@ -149,10 +149,123 @@
   resize: none;
   tab-size: 1;
   caret-color: #444;
+  line-height: 1.6;
 }
 
 .dark .editor-input {
   caret-color: #aaa;
+}
+
+/* GitHub Markdown 스타일 간격 적용 */
+.editor-input p {
+  margin-top: 0 !important;
+  margin-bottom: 4px !important;
+  line-height: 1.4 !important;
+}
+
+.editor-input h1 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  font-size: 2em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid oklch(0.922 0 0);
+}
+
+.dark .editor-input h1 {
+  border-bottom-color: oklch(1 0 0 / 10%);
+}
+
+.editor-input h2 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  font-size: 1.5em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid oklch(0.922 0 0);
+}
+
+.dark .editor-input h2 {
+  border-bottom-color: oklch(1 0 0 / 10%);
+}
+
+.editor-input h3 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  font-size: 1.25em;
+}
+
+.editor-input h4 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  font-size: 1em;
+}
+
+.editor-input h5 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  font-size: 0.875em;
+}
+
+.editor-input h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  font-size: 0.85em;
+  color: oklch(0.556 0 0);
+}
+
+.dark .editor-input h6 {
+  color: oklch(0.708 0 0);
+}
+
+.editor-input ul,
+.editor-input ol {
+  margin-top: 0;
+  margin-bottom: 10px;
+  padding-left: 2em;
+}
+
+.editor-input li {
+  margin-top: 0.25em;
+}
+
+.editor-input blockquote {
+  margin: 0;
+  margin-bottom: 10px;
+  padding: 0 1em;
+  color: oklch(0.556 0 0);
+  border-left: 0.25em solid oklch(0.922 0 0);
+}
+
+.dark .editor-input blockquote {
+  color: oklch(0.708 0 0);
+  border-left-color: oklch(1 0 0 / 10%);
+}
+
+.editor-input pre {
+  margin-bottom: 16px;
+}
+
+.editor-input hr {
+  height: 0.25em;
+  padding: 0;
+  margin: 24px 0;
+  background-color: oklch(0.922 0 0);
+  border: 0;
+}
+
+.dark .editor-input hr {
+  background-color: oklch(1 0 0 / 10%);
 }
 
 /* Placeholder 스타일 */

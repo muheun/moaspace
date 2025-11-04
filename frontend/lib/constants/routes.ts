@@ -22,8 +22,6 @@ export const AUTH_CONFIG = {
     '/login',         // 로그인 페이지
     '/callback',      // OAuth 콜백
     '/test-editor',   // 에디터 테스트
-    '/posts',         // 게시판 목록 (공개)
-    '/posts/[id]',    // 게시글 상세 (공개)
     '/clear-auth',    // 인증 정보 초기화 (디버깅용)
   ],
 
@@ -33,6 +31,8 @@ export const AUTH_CONFIG = {
    * - Header에서 useAuth() 호출하여 사용자 정보 표시
    */
   protected: [
+    '/posts',           // 게시판 목록 (인증 필요)
+    '/posts/[id]',      // 게시글 상세 (인증 필요)
     '/posts/new',       // 게시글 작성
     '/posts/[id]/edit', // 게시글 수정
   ],
