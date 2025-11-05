@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { isProtectedRoute } from '@/lib/constants/routes';
 
 /**
  * Axios 인스턴스 (JWT 인터셉터 포함)
@@ -55,9 +56,6 @@ api.interceptors.response.use(
         userMessage = '로그인이 만료되었습니다. 다시 로그인해주세요.';
         // JWT 만료 또는 인증 실패 - localStorage + Cookie 제거 후 리다이렉트
         if (typeof window !== 'undefined') {
-          // 동기 import 사용 (require는 동기, dynamic import는 비동기)
-          const { isProtectedRoute } = require('@/lib/constants/routes');
-
           localStorage.removeItem('access_token');
           document.cookie = 'access_token=; Max-Age=0; path=/;';
 

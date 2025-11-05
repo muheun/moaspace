@@ -4,7 +4,6 @@ import { use, useEffect } from 'react';
 import { redirect, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
-import { setAuthCookie } from './actions';
 
 /**
  * OAuth 콜백 핸들러 페이지 (React 19 + React Compiler)
@@ -36,7 +35,7 @@ export default function CallbackPage({
   const params = use(searchParams);
 
   useEffect(() => {
-    const { token, error, message } = params;
+    const { token, error } = params;
 
     // 에러가 있으면 3초 후 /login으로 리다이렉트
     if (error) {

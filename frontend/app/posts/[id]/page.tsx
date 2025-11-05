@@ -2,6 +2,7 @@
 
 import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -133,10 +134,12 @@ export default function PostDetailPage({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-4">
                 {post.author.profileImageUrl && (
-                  <img
+                  <Image
                     src={post.author.profileImageUrl}
                     alt={`${post.author.name} 프로필`}
-                    className="w-12 h-12 rounded-full"
+                    width={48}
+                    height={48}
+                    className="rounded-full"
                   />
                 )}
                 <div>
@@ -193,7 +196,9 @@ export default function PostDetailPage({
                 <div dangerouslySetInnerHTML={{ __html: post.contentHtml }} />
               </div>
             ) : (
-              <div className="whitespace-pre-wrap">{post.contentText}</div>
+              <div className="whitespace-pre-wrap text-gray-500">
+                (내용 없음)
+              </div>
             )}
           </section>
         </article>

@@ -128,7 +128,7 @@ function FloatingLinkEditor({ editor }: { editor: LexicalEditor }) {
       if (!mouseDownRef.current) {
         positionEditorElement(editorElem, rect)
       }
-      setLastSelection(selection)
+      setLastSelection($isRangeSelection(selection) ? selection : null)
     } else if (!activeElement || activeElement.className !== 'link-input') {
       positionEditorElement(editorElem, null)
       setLastSelection(null)
@@ -235,6 +235,9 @@ const blockTypeIconNames = {
   paragraph: 'paragraph',
   h1: 'h1',
   h2: 'h2',
+  h3: 'h3',
+  h4: 'h4',
+  h5: 'h5',
   quote: 'quote',
   ul: 'ul',
   ol: 'ol',

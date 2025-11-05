@@ -8,7 +8,7 @@
 'use client';
 
 import { $getRoot } from 'lexical'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import './styles/editor.css'
 
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
@@ -25,7 +25,7 @@ import { AutoLinkNode, LinkNode } from '@lexical/link'
 import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin'
 import { ListPlugin } from '@lexical/react/LexicalListPlugin'
 import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin'
-import { TRANSFORMERS, $convertToMarkdownString } from '@lexical/markdown'
+import { TRANSFORMERS } from '@lexical/markdown'
 
 import ToolbarPlugin from './plugins/ToolbarPlugin'
 import AutoLinkPlugin from './plugins/AutoLinkPlugin'
@@ -96,10 +96,10 @@ function createEditorConfig() {
 // 초기값 설정 플러그인
 function InitialValuePlugin({ initialContent }: { initialContent?: string }) {
   const [editor] = useLexicalComposerContext()
-  const [isFirst, setIsFirst] = useState(true)
+  const isFirst = useRef(true)
 
   useEffect(() => {
-    if (!initialContent || !isFirst) return
+    if (!initialContent || !isFirst.current) return
 
     editor.update(() => {
       const root = $getRoot()
@@ -131,8 +131,8 @@ function InitialValuePlugin({ initialContent }: { initialContent?: string }) {
       }
     })
 
-    setIsFirst(false)
-  }, [editor, initialContent, isFirst])
+    isFirst.current = false
+  }, [editor, initialContent])
 
   return null
 }

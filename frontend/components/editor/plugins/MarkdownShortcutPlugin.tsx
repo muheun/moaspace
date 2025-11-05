@@ -13,9 +13,6 @@
 
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import {
-  TRANSFORMERS,
-} from '@lexical/markdown';
 
 export function MarkdownShortcutPlugin() {
   const [editor] = useLexicalComposerContext();

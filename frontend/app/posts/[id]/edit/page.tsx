@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState, useEffect } from 'react';
+import { use, useState, useEffect, useRef, startTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
@@ -48,42 +48,43 @@ export default function EditPostPage({
   const [title, setTitle] = useState('');
   const [contentHtml, setContentHtml] = useState('');
   const [hashtags, setHashtags] = useState('');
-  const [isInitialized, setIsInitialized] = useState(false);
+  const isInitialized = useRef(false);
 
   /**
    * 게시글 데이터 로드 후 폼 초기화
-   * 참조 프로젝트 패턴: HTML을 에디터 초기값으로 사용 (포맷 적용된 상태로 표시)
    *
-   * 중요: Lexical은 HTML만 파싱 가능!
-   * - contentHtml 있음 → 그대로 사용
-   * - contentHtml 없고 contentMarkdown 있음 → Markdown을 HTML로 변환
-   * - 둘 다 없음 → contentText를 HTML로 래핑
+   * Backend PostResponse는 항상 contentHtml과 contentMarkdown 모두 제공
+   * - contentHtml 우선 사용 (렌더링된 HTML)
+   * - contentHtml 없으면 contentMarkdown을 HTML로 변환
+   * - contentText는 Backend 응답에 포함되지 않음 (벡터화 전용, DB 내부용)
    */
   useEffect(() => {
-    if (post && !isInitialized) {
-      setTitle(post.title);
-      setHashtags(post.hashtags.join(', '));
+    if (post && !isInitialized.current) {
+      startTransition(() => {
+        setTitle(post.title);
+        setHashtags(post.hashtags.join(', '));
 
-      // HTML 우선, 없으면 Markdown을 HTML로 변환
-      if (post.contentHtml) {
-        setContentHtml(post.contentHtml);
-      } else if (post.contentMarkdown) {
-        // Markdown → HTML 변환 (Lexical이 파싱할 수 있도록)
-        const html = marked.parse(post.contentMarkdown, { async: false }) as string;
-        setContentHtml(html);
-      } else {
-        // Plain text를 HTML로 래핑
-        setContentHtml(`<p>${post.contentText}</p>`);
-      }
+        // HTML 우선, 없으면 Markdown을 HTML로 변환
+        if (post.contentHtml) {
+          setContentHtml(post.contentHtml);
+        } else if (post.contentMarkdown) {
+          // Markdown → HTML 변환 (Lexical이 파싱할 수 있도록)
+          const html = marked.parse(post.contentMarkdown, { async: false }) as string;
+          setContentHtml(html);
+        } else {
+          // 둘 다 없으면 빈 에디터 (실제로는 Backend가 항상 둘 다 제공하므로 발생하지 않음)
+          setContentHtml('<p></p>');
+        }
+      });
 
-      setIsInitialized(true);
+      isInitialized.current = true;
     }
-  }, [post, isInitialized]);
+  }, [post]);
 
   /**
    * Lexical 에디터 내용 변경 시 호출
    */
-  const handleEditorChange = (html: string, _text: string) => {
+  const handleEditorChange = (html: string) => {
     setContentHtml(html);
   };
 

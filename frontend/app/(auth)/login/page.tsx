@@ -1,7 +1,6 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { useRouter } from 'next/navigation';
 
 /**
  * 로그인 페이지
@@ -13,7 +12,6 @@ import { useRouter } from 'next/navigation';
  * - ARIA: aria-label로 버튼 설명 추가
  */
 export default function LoginPage() {
-  const router = useRouter();
 
   /**
    * Google OAuth 로그인 시작

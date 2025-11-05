@@ -12,10 +12,7 @@ import { postsApi } from '@/lib/api/posts';
 import type {
   CreatePostRequest,
   UpdatePostRequest,
-  PostDto,
-  PostListResponse,
   VectorSearchRequest,
-  VectorSearchResponse,
 } from '@/types/api/post';
 
 /**

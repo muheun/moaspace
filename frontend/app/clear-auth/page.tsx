@@ -46,7 +46,7 @@ export default function ClearAuthPage() {
         } else {
           results.push('❌ Cookie 삭제 실패');
         }
-      } catch (error) {
+      } catch {
         // API가 없어도 클라이언트에서 직접 삭제
         document.cookie = 'access_token=; Max-Age=0; path=/;';
         results.push('✅ Cookie 직접 삭제 시도');

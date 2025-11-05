@@ -20,18 +20,14 @@ export interface AuthorInfo {
 
 export interface CreatePostRequest {
   title: string;              // 1~200자, 필수
-  contentMarkdown: string;    // 마크다운 원본, 필수
-  contentHtml: string;        // HTML 렌더링, 필수
-  contentText: string;        // Plain Text 벡터화용, 필수
+  contentHtml: string;        // HTML 렌더링, 필수 (Backend가 Markdown과 Text 자동 변환)
   hashtags: string[];         // 해시태그 배열, 기본값 []
 }
 
 export interface UpdatePostRequest {
-  title?: string;              // 1~200자, 선택
-  contentMarkdown?: string;    // 마크다운 원본, 선택
-  contentHtml?: string;        // HTML 렌더링, 선택
-  contentText?: string;        // Plain Text 벡터화용, 선택
-  hashtags?: string[];         // 해시태그 배열, 선택
+  title: string;               // 1~200자, 필수 (Backend 요구사항)
+  contentHtml: string;         // HTML 렌더링, 필수 (Backend가 Markdown과 Text 자동 변환)
+  hashtags: string[];          // 해시태그 배열, 기본값 [] (Backend 요구사항)
 }
 
 export interface VectorSearchRequest {

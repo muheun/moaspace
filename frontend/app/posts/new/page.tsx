@@ -38,7 +38,7 @@ export default function NewPostPage() {
   const [contentHtml, setContentHtml] = useState('');
   const [hashtags, setHashtags] = useState('');
 
-  const handleEditorChange = (html: string, _text: string) => {
+  const handleEditorChange = (html: string) => {
     setContentHtml(html);
   };
 
