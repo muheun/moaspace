@@ -83,9 +83,14 @@ export default function EditPostPage({
 
   /**
    * Lexical 에디터 내용 변경 시 호출
+   *
+   * @param html - HTML 포맷 (contentHtml 필드에 저장)
+   * @param text - Plain Text (Backend가 자동 추출하므로 Frontend에서는 미사용)
    */
-  const handleEditorChange = (html: string) => {
+  const handleEditorChange = (html: string, text: string) => {
     setContentHtml(html);
+    // text 파라미터는 LexicalEditor의 onChange 시그니처와 일치시키기 위해 받지만,
+    // Constitution Principle VIII에 따라 Backend가 contentHtml → contentText 자동 변환
   };
 
   /**
