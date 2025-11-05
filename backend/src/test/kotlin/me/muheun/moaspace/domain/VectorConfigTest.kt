@@ -1,5 +1,6 @@
 package me.muheun.moaspace.domain
 
+import me.muheun.moaspace.domain.vector.VectorConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test

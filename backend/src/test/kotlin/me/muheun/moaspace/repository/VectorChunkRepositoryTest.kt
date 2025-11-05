@@ -1,7 +1,7 @@
 package me.muheun.moaspace.repository
 
 import com.pgvector.PGvector
-import me.muheun.moaspace.domain.VectorChunk
+import me.muheun.moaspace.domain.vector.VectorChunk
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired

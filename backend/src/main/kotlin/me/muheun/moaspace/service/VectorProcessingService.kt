@@ -1,6 +1,6 @@
 package me.muheun.moaspace.service
 
-import me.muheun.moaspace.domain.VectorChunk
+import me.muheun.moaspace.domain.vector.VectorChunk
 import me.muheun.moaspace.event.VectorIndexingRequestedEvent
 import me.muheun.moaspace.repository.VectorChunkRepository
 import kotlinx.coroutines.*

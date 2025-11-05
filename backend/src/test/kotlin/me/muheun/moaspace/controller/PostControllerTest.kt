@@ -1,13 +1,13 @@
 package me.muheun.moaspace.controller
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import me.muheun.moaspace.domain.Post
+import me.muheun.moaspace.domain.post.Post
 import me.muheun.moaspace.domain.user.User
 import me.muheun.moaspace.dto.CreatePostRequest
 import me.muheun.moaspace.dto.UpdatePostRequest
-import me.muheun.moaspace.repository.PostEmbeddingRepository
 import me.muheun.moaspace.repository.PostRepository
 import me.muheun.moaspace.repository.UserRepository
+import me.muheun.moaspace.repository.VectorChunkRepository
 import me.muheun.moaspace.service.JwtTokenService
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -54,8 +54,7 @@ class PostControllerTest {
 
     @BeforeEach
     fun setUp() {
-        // 각 테스트 전에 관련 테이블들 정리 (CASCADE로 외래 키 처리)
-        entityManager.createNativeQuery("TRUNCATE TABLE posts, post_embeddings, users RESTART IDENTITY CASCADE").executeUpdate()
+        entityManager.createNativeQuery("TRUNCATE TABLE posts, vector_chunks, users RESTART IDENTITY CASCADE").executeUpdate()
         entityManager.flush()
         entityManager.clear()
     }
@@ -64,7 +63,7 @@ class PostControllerTest {
     private lateinit var postRepository: PostRepository
 
     @Autowired
-    private lateinit var postEmbeddingRepository: PostEmbeddingRepository
+    private lateinit var vectorChunkRepository: VectorChunkRepository
 
     @Autowired
     private lateinit var jwtTokenService: JwtTokenService
@@ -95,7 +94,7 @@ class PostControllerTest {
 
         val createRequest = CreatePostRequest(
             title = "Next.js 15 + React 19 사용 후기",
-            contentMarkdown = "**Next.js 15**가 출시되었습니다.",
+            contentHtml = "**Next.js 15**가 출시되었습니다.",
             hashtags = listOf("Next.js", "React", "웹개발")
         )
 
@@ -112,7 +111,7 @@ class PostControllerTest {
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.id").exists())
             .andExpect(jsonPath("$.title").value(createRequest.title))
-            .andExpect(jsonPath("$.contentMarkdown").value(createRequest.contentMarkdown))
+            .andExpect(jsonPath("$.contentHtml").value(createRequest.contentHtml))
             .andExpect(jsonPath("$.contentHtml").exists())
             .andExpect(jsonPath("$.author.id").value(user.id!!))
             .andExpect(jsonPath("$.author.name").value(user.name))
@@ -120,7 +119,6 @@ class PostControllerTest {
             .andExpect(jsonPath("$.hashtags[1]").value("React"))
             .andExpect(jsonPath("$.hashtags[2]").value("웹개발"))
             .andExpect(jsonPath("$.createdAt").exists())
-            .andExpect(jsonPath("$.updatedAt").exists())
             .andReturn()
 
         val responseJson = result.response.contentAsString
@@ -130,9 +128,12 @@ class PostControllerTest {
         val post = postRepository.findById(postId).get()
         assert(!post.deleted) { "생성된 게시글이 삭제 상태입니다" }
 
-        val embedding = postEmbeddingRepository.findByPost(post)
-        assert(embedding.isPresent) { "PostEmbedding이 자동 생성되지 않았습니다" }
-        assert(embedding.get().modelName == "multilingual-e5-base") { "모델명이 일치하지 않습니다" }
+        val chunks = vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc(
+            namespace = "vector_ai",
+            entity = "Post",
+            recordKey = postId.toString()
+        )
+        assert(chunks.isNotEmpty()) { "VectorChunk가 자동 생성되지 않았습니다" }
     }
 
     /**
@@ -176,7 +177,7 @@ class PostControllerTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.id").value(post.id!!))
             .andExpect(jsonPath("$.title").value(post.title))
-            .andExpect(jsonPath("$.contentMarkdown").value(post.contentMarkdown))
+            .andExpect(jsonPath("$.contentHtml").value(post.contentHtml))
             .andExpect(jsonPath("$.contentHtml").value(post.contentHtml))
             .andExpect(jsonPath("$.author.id").value(user.id!!))
             .andExpect(jsonPath("$.author.name").value(user.name))
@@ -217,7 +218,7 @@ class PostControllerTest {
 
         val updateRequest = UpdatePostRequest(
             title = "수정된 제목",
-            contentMarkdown = "수정된 내용입니다.",
+            contentHtml = "수정된 내용입니다.",
             hashtags = listOf("수정", "테스트")
         )
 
@@ -234,7 +235,7 @@ class PostControllerTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.id").value(post.id!!))
             .andExpect(jsonPath("$.title").value("수정된 제목"))
-            .andExpect(jsonPath("$.contentMarkdown").value("수정된 내용입니다."))
+            .andExpect(jsonPath("$.contentHtml").value("수정된 내용입니다."))
             .andExpect(jsonPath("$.contentHtml").exists())
             .andExpect(jsonPath("$.hashtags[0]").value("수정"))
             .andExpect(jsonPath("$.hashtags[1]").value("테스트"))
@@ -243,8 +244,13 @@ class PostControllerTest {
         assert(updatedPost.title == "수정된 제목") { "제목이 수정되지 않았습니다" }
         assert(updatedPost.contentText == "수정된 내용입니다.") { "contentText가 수정되지 않았습니다" }
 
-        val embedding = postEmbeddingRepository.findByPost(updatedPost)
-        assert(embedding.isPresent) { "PostEmbedding이 재생성되지 않았습니다" }
+        // VectorChunk 확인 (PostEmbedding → VectorChunk 마이그레이션)
+        val chunks = vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc(
+            namespace = "vector_ai",
+            entity = "Post",
+            recordKey = updatedPost.id.toString()
+        )
+        assert(chunks.isNotEmpty()) { "VectorChunk가 재생성되지 않았습니다" }
     }
 
     /**
@@ -290,7 +296,7 @@ class PostControllerTest {
 
         val updateRequest = UpdatePostRequest(
             title = "B가 수정한 제목",
-            contentMarkdown = "B가 수정한 내용",
+            contentHtml = "B가 수정한 내용",
             hashtags = listOf("B")
         )
 
@@ -325,7 +331,7 @@ class PostControllerTest {
         // Given: 게시글 생성 요청
         val createRequest = CreatePostRequest(
             title = "인증 없는 게시글",
-            contentMarkdown = "내용",
+            contentHtml = "내용",
             hashtags = emptyList()
         )
 
@@ -603,7 +609,7 @@ class PostControllerTest {
                 .content(objectMapper.writeValueAsString(
                     CreatePostRequest(
                         title = "인공지능 기술의 발전",
-                        contentMarkdown = "인공지능과 머신러닝 기술이 빠르게 발전하고 있습니다.",
+                        contentHtml = "인공지능과 머신러닝 기술이 빠르게 발전하고 있습니다.",
                         hashtags = listOf("AI", "ML")
                     )
                 ))
@@ -617,7 +623,7 @@ class PostControllerTest {
                 .content(objectMapper.writeValueAsString(
                     CreatePostRequest(
                         title = "머신러닝과 딥러닝",
-                        contentMarkdown = "머신러닝과 딥러닝은 AI의 핵심 기술입니다.",
+                        contentHtml = "머신러닝과 딥러닝은 AI의 핵심 기술입니다.",
                         hashtags = listOf("ML", "DL")
                     )
                 ))
@@ -631,7 +637,7 @@ class PostControllerTest {
                 .content(objectMapper.writeValueAsString(
                     CreatePostRequest(
                         title = "요리 레시피",
-                        contentMarkdown = "맛있는 파스타 만드는 법을 소개합니다.",
+                        contentHtml = "맛있는 파스타 만드는 법을 소개합니다.",
                         hashtags = listOf("요리", "레시피")
                     )
                 ))

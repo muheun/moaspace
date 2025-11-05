@@ -10,4 +10,4 @@
 -- - CASCADE: 외래 키 제약 조건이 있어도 삭제 가능
 
 -- VectorChunk 테이블 초기화
-TRUNCATE TABLE vector_chunk RESTART IDENTITY CASCADE;
+TRUNCATE TABLE vector_chunks RESTART IDENTITY CASCADE;

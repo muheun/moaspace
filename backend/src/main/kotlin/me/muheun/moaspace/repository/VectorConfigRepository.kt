@@ -1,6 +1,6 @@
 package me.muheun.moaspace.repository
 
-import me.muheun.moaspace.domain.VectorConfig
+import me.muheun.moaspace.domain.vector.VectorConfig
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.stereotype.Repository
 

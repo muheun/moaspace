@@ -1,4 +1,4 @@
-package me.muheun.moaspace.domain
+package me.muheun.moaspace.domain.vector
 
 import me.muheun.moaspace.config.PGvectorType
 import com.pgvector.PGvector
@@ -30,7 +30,7 @@ import java.time.LocalDateTime
  */
 @Entity
 @Table(
-    name = "vector_chunk",
+    name = "vector_chunks",
     indexes = [
         // 특정 레코드의 모든 청크 조회 (재인덱싱 시 삭제용)
         Index(name = "idx_vector_chunk_lookup", columnList = "namespace, entity, record_key"),

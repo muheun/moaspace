@@ -3,7 +3,6 @@ package me.muheun.moaspace.controller
 import jakarta.validation.Valid
 import me.muheun.moaspace.dto.*
 import me.muheun.moaspace.service.PostService
-import me.muheun.moaspace.service.PostVectorService
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -35,7 +34,9 @@ import java.time.LocalDateTime
 @RequestMapping("/api/posts")
 class PostController(
     private val postService: PostService,
-    private val postVectorService: PostVectorService
+    private val vectorChunkRepository: me.muheun.moaspace.repository.VectorChunkRepository,
+    private val postRepository: me.muheun.moaspace.repository.PostRepository,
+    private val vectorEmbeddingService: me.muheun.moaspace.service.VectorEmbeddingService
 ) {
 
     private val logger = LoggerFactory.getLogger(PostController::class.java)
@@ -160,10 +161,10 @@ class PostController(
     }
 
     /**
-     * 벡터 검색
+     * 벡터 검색 (VectorChunk 기반)
      * T063-T064: POST /api/posts/search 엔드포인트 구현
      *
-     * 게시글의 plainContent를 벡터화하여 유사도 검색을 수행합니다.
+     * VectorChunk를 활용한 범용 벡터 검색입니다.
      * Constitution Principle III: 임계값 이상의 결과만 반환
      *
      * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
@@ -178,13 +179,31 @@ class PostController(
     ): ResponseEntity<VectorSearchResponse> {
         logger.info("벡터 검색 요청: query=${request.query.take(50)}, threshold=${request.threshold}, limit=${request.limit}")
 
-        val (postEmbeddings, similarities) = postVectorService.searchSimilarPostsWithScores(
-            queryText = request.query,
-            threshold = request.threshold,
+        // 1. 쿼리 벡터화
+        val queryVector = vectorEmbeddingService.generateEmbedding(request.query).toArray()
+
+        // 2. VectorChunk 기반 레코드별 유사도 검색
+        val recordScores = vectorChunkRepository.findSimilarRecords(
+            queryVector = queryVector,
+            namespace = "vector_ai",
+            entity = "Post",
             limit = request.limit
         )
 
-        val response = VectorSearchResponse.from(postEmbeddings, similarities)
+        // 3. threshold 필터링 및 Post 조회
+        val results = recordScores
+            .filter { it.score >= request.threshold }
+            .mapNotNull { scoreDto ->
+                val postId = scoreDto.recordKey.toLongOrNull() ?: return@mapNotNull null
+                postRepository.findById(postId).map { post ->
+                    SearchResult(
+                        post = PostSummary.from(post),
+                        similarity = scoreDto.score
+                    )
+                }.orElse(null)
+            }
+
+        val response = VectorSearchResponse(results = results)
 
         logger.info("벡터 검색 완료: 결과 수=${response.results.size}")
 

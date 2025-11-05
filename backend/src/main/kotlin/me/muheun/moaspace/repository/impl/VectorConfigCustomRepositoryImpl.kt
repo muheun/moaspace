@@ -1,8 +1,8 @@
 package me.muheun.moaspace.repository.impl
 
 import com.querydsl.jpa.impl.JPAQueryFactory
-import me.muheun.moaspace.domain.QVectorConfig
-import me.muheun.moaspace.domain.VectorConfig
+import me.muheun.moaspace.domain.vector.QVectorConfig
+import me.muheun.moaspace.domain.vector.VectorConfig
 import me.muheun.moaspace.query.whereAnd
 import me.muheun.moaspace.repository.VectorConfigCustomRepository
 import org.slf4j.LoggerFactory

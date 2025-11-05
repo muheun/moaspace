@@ -64,6 +64,20 @@ class VectorConfigController(
     }
 
     /**
+     * 엔티티 타입별 모든 벡터 설정 조회
+     *
+     * GET /api/vector-configs/entity/{entityType}
+     *
+     * @param entityType 엔티티 타입 (예: Post, Comment)
+     * @return 200 OK + 설정 DTO 리스트
+     */
+    @GetMapping("/entity/{entityType}")
+    fun findByEntityType(@PathVariable entityType: String): ResponseEntity<List<VectorConfigResponse>> {
+        val responses = vectorConfigService.findByEntityType(entityType)
+        return ResponseEntity.ok(responses)
+    }
+
+    /**
      * 엔티티 타입과 필드명으로 벡터 설정 조회
      *
      * GET /api/vector-configs/entity/{entityType}/field/{fieldName}

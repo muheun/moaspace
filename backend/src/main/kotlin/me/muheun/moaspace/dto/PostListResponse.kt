@@ -1,6 +1,6 @@
 package me.muheun.moaspace.dto
 
-import me.muheun.moaspace.domain.Post
+import me.muheun.moaspace.domain.post.Post
 import org.springframework.data.domain.Page
 
 /**
@@ -35,7 +35,7 @@ data class PostListResponse(
 data class PostSummary(
     val id: Long,
     val title: String,
-    val excerpt: String, // content의 첫 100자 (미리보기)
+    val excerpt: String,
     val author: AuthorInfo,
     val hashtags: List<String>,
     val createdAt: java.time.LocalDateTime,

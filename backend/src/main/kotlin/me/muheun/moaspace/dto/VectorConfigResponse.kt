@@ -1,6 +1,6 @@
 package me.muheun.moaspace.dto
 
-import me.muheun.moaspace.domain.VectorConfig
+import me.muheun.moaspace.domain.vector.VectorConfig
 import java.time.LocalDateTime
 
 /**

@@ -36,7 +36,7 @@ COMMENT ON COLUMN posts.plain_content IS '순수 텍스트 본문 (벡터 임베
 -- Step 3: Vector Chunk 테이블 생성
 -- ============================================================
 
-CREATE TABLE vector_chunk (
+CREATE TABLE vector_chunks (
     id BIGSERIAL PRIMARY KEY,
     namespace VARCHAR(100) NOT NULL DEFAULT 'vector_ai',
     entity VARCHAR(100) NOT NULL,
@@ -52,21 +52,21 @@ CREATE TABLE vector_chunk (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_vector_chunk_lookup ON vector_chunk(namespace, entity, record_key);
-CREATE INDEX idx_vector_chunk_field ON vector_chunk(namespace, entity, field_name);
-CREATE INDEX idx_vector_chunk_order ON vector_chunk(namespace, entity, record_key, chunk_index);
+CREATE INDEX idx_vector_chunk_lookup ON vector_chunks(namespace, entity, record_key);
+CREATE INDEX idx_vector_chunk_field ON vector_chunks(namespace, entity, field_name);
+CREATE INDEX idx_vector_chunk_order ON vector_chunks(namespace, entity, record_key, chunk_index);
 
 CREATE INDEX idx_vector_chunk_vector
-ON vector_chunk
+ON vector_chunks
 USING ivfflat (chunk_vector vector_cosine_ops)
 WITH (lists = 100);
 
 CREATE INDEX idx_vector_chunk_metadata
-ON vector_chunk
+ON vector_chunks
 USING gin (metadata);
 
-COMMENT ON TABLE vector_chunk IS '범용 벡터 청크 저장소 (768차원 - multilingual-e5-base)';
-COMMENT ON COLUMN vector_chunk.chunk_vector IS '768차원 벡터 임베딩';
+COMMENT ON TABLE vector_chunks IS '범용 벡터 청크 저장소 (768차원 - multilingual-e5-base)';
+COMMENT ON COLUMN vector_chunks.chunk_vector IS '768차원 벡터 임베딩';
 
 -- ============================================================
 -- 완료

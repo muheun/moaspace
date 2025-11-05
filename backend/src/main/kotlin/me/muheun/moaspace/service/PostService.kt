@@ -1,6 +1,6 @@
 package me.muheun.moaspace.service
 
-import me.muheun.moaspace.domain.Post
+import me.muheun.moaspace.domain.post.Post
 import me.muheun.moaspace.dto.CreatePostRequest
 import me.muheun.moaspace.dto.UpdatePostRequest
 import me.muheun.moaspace.repository.PostRepository
@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional
 class PostService(
     private val postRepository: PostRepository,
     private val userRepository: UserRepository,
-    private val postVectorService: PostVectorService
+    private val vectorIndexingService: VectorIndexingService
 ) {
 
     private val logger = LoggerFactory.getLogger(PostService::class.java)
@@ -71,7 +71,14 @@ class PostService(
         val savedPost = postRepository.save(post)
         logger.info("게시글 저장 완료: postId=${savedPost.id}")
 
-        postVectorService.vectorizePost(savedPost)
+        vectorIndexingService.indexEntity(
+            entityType = "Post",
+            recordKey = savedPost.id.toString(),
+            fields = mapOf(
+                "title" to sanitizedTitle,
+                "content" to contentText
+            )
+        )
         logger.info("게시글 벡터화 완료: postId=${savedPost.id}")
 
         return savedPost
@@ -275,7 +282,14 @@ class PostService(
         val updatedPost = postRepository.save(post)
         logger.info("게시글 업데이트 완료: postId=$postId")
 
-        postVectorService.regenerateVector(updatedPost)
+        vectorIndexingService.reindexEntity(
+            entityType = "Post",
+            recordKey = updatedPost.id.toString(),
+            fields = mapOf(
+                "title" to post.title,
+                "content" to post.contentText
+            )
+        )
         logger.info("게시글 벡터 재생성 완료: postId=$postId")
 
         return updatedPost

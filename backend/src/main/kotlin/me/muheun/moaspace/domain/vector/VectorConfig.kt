@@ -1,4 +1,4 @@
-package me.muheun.moaspace.domain
+package me.muheun.moaspace.domain.vector
 
 import jakarta.persistence.*
 import java.time.LocalDateTime

@@ -1,6 +1,6 @@
 package me.muheun.moaspace.repository
 
-import me.muheun.moaspace.domain.Post
+import me.muheun.moaspace.domain.post.Post
 import me.muheun.moaspace.domain.user.User
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
@@ -77,7 +77,7 @@ class PostRepositoryTest {
         assertEquals(2, savedPost.hashtags.size)
         assertFalse(savedPost.deleted)
         assertNotNull(savedPost.createdAt)
-        assertNotNull(savedPost.updatedAt)
+        // updatedAt은 생성 시에는 null, 수정 시에만 @PreUpdate로 설정됨
     }
 
     /**
@@ -211,7 +211,7 @@ class PostRepositoryTest {
         // Given
         val user = createAndSaveUser("update@example.com", "수정 사용자")
         val post = createAndSavePost(user, "원래 제목", "원래 내용")
-        val originalUpdatedAt = post.updatedAt
+        assertNull(post.updatedAt) // 생성 직후에는 null
 
         // When
         Thread.sleep(100) // 시간 차이를 두기 위해
@@ -228,7 +228,8 @@ class PostRepositoryTest {
         assertEquals("수정된 내용", updatedPost.contentMarkdown)
         assertEquals("<p>수정된 내용</p>", updatedPost.contentHtml)
         assertEquals("수정된 내용", updatedPost.contentText)
-        assertTrue(updatedPost.updatedAt.isAfter(originalUpdatedAt))
+        assertNotNull(updatedPost.updatedAt) // 수정 후에는 @PreUpdate로 설정됨
+        assertTrue(updatedPost.updatedAt!!.isAfter(updatedPost.createdAt)) // updatedAt > createdAt
     }
 
     /**

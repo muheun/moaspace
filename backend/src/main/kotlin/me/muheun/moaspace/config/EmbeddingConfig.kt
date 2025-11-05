@@ -16,7 +16,6 @@ import java.io.IOException
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
-
 private val logger = LoggerFactory.getLogger(EmbeddingConfig::class.java)
 
 /**
@@ -87,6 +86,8 @@ class EmbeddingConfig {
     @Min(value = 32, message = "vector.embedding.max-tokens는 최소 32 이상이어야 합니다")
     @Max(value = 8192, message = "vector.embedding.max-tokens는 최대 8192 이하여야 합니다")
     private var maxTokens: Int = 512
+
+    private var isClosed = false
 
     /**
      * 애플리케이션 시작 시 설정값 검증
@@ -252,6 +253,11 @@ class EmbeddingConfig {
     @PreDestroy
     fun cleanup() {
         try {
+            if (isClosed) {
+                logger.debug("이미 정리된 리소스입니다. 건너뜁니다.")
+                return
+            }
+
             logger.info("ONNX 리소스 정리 시작...")
 
             // OrtSession 정리
@@ -259,6 +265,8 @@ class EmbeddingConfig {
                 try {
                     session.close()
                     logger.info("✓ OrtSession 정리 완료")
+                } catch (e: IllegalStateException) {
+                    logger.debug("OrtSession이 이미 닫혀있습니다.")
                 } catch (e: Exception) {
                     logger.error("✗ OrtSession 정리 실패: ${e.message}", e)
                 }
@@ -284,6 +292,7 @@ class EmbeddingConfig {
                 }
             }
 
+            isClosed = true
             logger.info("ONNX 리소스 정리 완료")
 
         } catch (e: Exception) {

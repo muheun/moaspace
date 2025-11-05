@@ -1,6 +1,6 @@
 package me.muheun.moaspace.repository
 
-import me.muheun.moaspace.domain.VectorConfig
+import me.muheun.moaspace.domain.vector.VectorConfig
 
 /**
  * VectorConfig 엔티티에 대한 Kotlin JDSL 기반 Custom Repository 인터페이스

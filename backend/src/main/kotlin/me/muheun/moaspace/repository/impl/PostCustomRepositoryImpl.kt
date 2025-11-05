@@ -3,8 +3,8 @@ package me.muheun.moaspace.repository.impl
 import com.querydsl.core.BooleanBuilder
 import com.querydsl.core.types.dsl.Expressions
 import com.querydsl.jpa.impl.JPAQueryFactory
-import me.muheun.moaspace.domain.Post
-import me.muheun.moaspace.domain.QPost
+import me.muheun.moaspace.domain.post.Post
+import me.muheun.moaspace.domain.post.QPost
 import me.muheun.moaspace.domain.user.QUser
 import me.muheun.moaspace.mapper.PostMapper
 import me.muheun.moaspace.query.dto.PostSearchFilter
