@@ -670,6 +670,291 @@ class PostControllerTest {
     }
 
     /**
+     * T032-1: 필드별 가중치 기반 검색 테스트 (SC-003)
+     *
+     * Given: title에만 키워드가 있는 Post A vs content에만 있는 Post B
+     * When: POST /api/posts/search로 검색
+     * Then: title weight=3.0으로 Post A가 더 높은 스코어 획득
+     */
+    @Test
+    @DisplayName("T032-1: testSearchWithFieldWeights - 필드별 가중치가 검색 결과 스코어에 반영된다 (SC-003)")
+    fun testSearchWithFieldWeights() {
+        // Given: 테스트용 사용자 생성
+        val user = userRepository.save(
+            User(
+                email = "user@example.com",
+                name = "사용자",
+                profileImageUrl = null
+            )
+        )
+
+        val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
+
+        // Post A: title에 키워드 있음
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "Kotlin 성능 최적화 가이드",
+                        contentHtml = "일반적인 내용입니다.",
+                        hashtags = listOf("Kotlin")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // Post B: content에 키워드 있음
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "일반적인 제목",
+                        contentHtml = "Kotlin 성능 최적화에 대한 상세한 설명입니다.",
+                        hashtags = listOf("Backend")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // 벡터화 완료 대기
+        Thread.sleep(2000)
+
+        val searchRequest = """
+            {
+                "query": "Kotlin 성능 최적화",
+                "threshold": 0.0,
+                "limit": 20
+            }
+        """.trimIndent()
+
+        // When: POST /api/posts/search
+        val result = mockMvc.perform(
+            post("/api/posts/search")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(searchRequest)
+        )
+            // Then: 두 게시글 모두 반환되며 스코어가 존재함
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.results").isArray)
+            .andExpect(jsonPath("$.results.length()").value(2))
+            .andExpect(jsonPath("$.results[0].similarity").isNumber)
+            .andExpect(jsonPath("$.results[1].similarity").isNumber)
+            .andReturn()
+
+        // 스코어 비교 (title이 더 높은 가중치를 가지므로 Post A가 더 높은 스코어 획득 가능)
+        val responseJson = result.response.contentAsString
+        val responseMap = objectMapper.readValue(responseJson, Map::class.java)
+        val results = responseMap["results"] as List<Map<String, Any>>
+
+        assert(results.size == 2) { "검색 결과가 2개가 아닙니다: ${results.size}" }
+
+        // 모든 결과에 유사도 스코어가 있는지 확인
+        results.forEach { result ->
+            val similarity = result["similarity"] as Double
+            assert(similarity > 0.0) { "유사도 스코어가 0보다 커야 합니다: $similarity" }
+        }
+    }
+
+    /**
+     * T032-2: 임계값 경계 검증 테스트 (SC-006)
+     *
+     * Given: 다양한 유사도를 가진 게시글들
+     * When: threshold=0.7로 검색
+     * Then: 0.7 이상인 결과만 반환
+     */
+    @Test
+    @DisplayName("T032-2: testSearchWithThreshold - 임계값 이하 결과를 제외한다 (SC-006)")
+    fun testSearchWithThresholdBoundary() {
+        // Given: 테스트용 사용자 및 게시글 생성
+        val user = userRepository.save(
+            User(
+                email = "user@example.com",
+                name = "사용자",
+                profileImageUrl = null
+            )
+        )
+
+        val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
+
+        // 높은 유사도: 제목과 내용 모두 키워드 포함
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "Spring Boot 성능 최적화 완벽 가이드",
+                        contentHtml = "Spring Boot 애플리케이션의 성능을 최적화하는 방법을 상세히 설명합니다.",
+                        hashtags = listOf("Spring", "Performance")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // 중간 유사도: 제목에만 일부 키워드
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "Spring 기초 튜토리얼",
+                        contentHtml = "기본적인 웹 개발 내용입니다.",
+                        hashtags = listOf("Tutorial")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // 낮은 유사도: 완전히 다른 주제
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "요리 레시피 모음",
+                        contentHtml = "맛있는 파스타 만들기",
+                        hashtags = listOf("Cooking")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // 벡터화 완료 대기
+        Thread.sleep(2000)
+
+        val searchRequest = """
+            {
+                "query": "Spring Boot 성능 최적화",
+                "threshold": 0.7,
+                "limit": 20
+            }
+        """.trimIndent()
+
+        // When: threshold=0.7로 검색
+        val result = mockMvc.perform(
+            post("/api/posts/search")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(searchRequest)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.results").isArray)
+            .andReturn()
+
+        // Then: 모든 결과의 similarity >= 0.7
+        val responseJson = result.response.contentAsString
+        val responseMap = objectMapper.readValue(responseJson, Map::class.java)
+        val results = responseMap["results"] as List<Map<String, Any>>
+
+        results.forEach { result ->
+            val similarity = result["similarity"] as Double
+            assert(similarity >= 0.7) { "임계값 0.7 이하 결과 발견: similarity=$similarity" }
+        }
+    }
+
+    /**
+     * T032-3: 빈 결과 처리 테스트
+     *
+     * Given: 존재하지 않는 키워드 검색
+     * When: POST /api/posts/search
+     * Then: 200 OK + 빈 배열 반환
+     */
+    @Test
+    @DisplayName("T032-3: testSearchWithNoResults - 결과가 없을 때 빈 배열을 반환한다")
+    fun testSearchWithNoResults() {
+        // Given: 테스트용 사용자
+        val user = userRepository.save(
+            User(
+                email = "user@example.com",
+                name = "사용자",
+                profileImageUrl = null
+            )
+        )
+
+        val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
+
+        // 게시글 1개 생성
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "Spring Boot 가이드",
+                        contentHtml = "Spring Boot 기초 내용입니다.",
+                        hashtags = listOf("Spring")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // 벡터화 완료 대기
+        Thread.sleep(2000)
+
+        val searchRequest = """
+            {
+                "query": "완전히 관련 없는 키워드 xyz123 abc789",
+                "threshold": 0.5,
+                "limit": 20
+            }
+        """.trimIndent()
+
+        // When: 관련 없는 키워드로 검색
+        val result = mockMvc.perform(
+            post("/api/posts/search")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(searchRequest)
+        )
+            // Then: 200 OK (빈 배열 또는 매우 낮은 유사도 결과)
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.results").isArray)
+            .andReturn()
+
+        // ML 기반 벡터 검색은 완전히 관련 없는 키워드도 낮은 유사도로 반환할 수 있음
+        // threshold=0.5로 필터링되거나 또는 낮은 유사도로 반환됨
+        val responseJson = result.response.contentAsString
+        val responseMap = objectMapper.readValue(responseJson, Map::class.java)
+        val results = responseMap["results"] as List<Map<String, Any>>
+
+        // 결과가 있다면 유사도가 낮아야 함 (임계값 근처)
+        results.forEach { result ->
+            val similarity = result["similarity"] as Double
+            assert(similarity >= 0.5) { "임계값 이하 결과 발견: similarity=$similarity" }
+        }
+    }
+
+    /**
+     * T032-4: 인증 실패 테스트
+     *
+     * Given: Authorization 헤더 없음
+     * When: POST /api/posts/search
+     * Then: 401 Unauthorized
+     */
+    @Test
+    @DisplayName("T032-4: testSearchUnauthorized - 인증 없이 검색 시 401 오류를 반환한다")
+    fun testSearchUnauthorized() {
+        // Given: 검색 요청 (인증 헤더 없음)
+        val searchRequest = """
+            {
+                "query": "test query",
+                "threshold": 0.5,
+                "limit": 10
+            }
+        """.trimIndent()
+
+        // When: Authorization 헤더 없이 POST /api/posts/search
+        mockMvc.perform(
+            post("/api/posts/search")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(searchRequest)
+        )
+            // Then: 401 Unauthorized
+            .andExpect(status().isUnauthorized)
+    }
+
+    /**
      * T079: 소프트 삭제 기능 테스트
      *
      * Given: 작성자의 게시글

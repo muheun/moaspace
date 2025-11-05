@@ -125,8 +125,8 @@ class VectorChunkRepositoryTest {
         // 쿼리 벡터
         val queryVector = floatArrayOf(0.9f, 0.9f, 0.9f) + FloatArray(765) { 0.0f }
 
-        // When: findByWeightedFieldScore() 호출
-        val results = vectorChunkRepository.findByWeightedFieldScore(queryVector, "posts", "post", 0.7, 0.3, 10)
+        // When: findByWeightedFieldScore() 호출 (가중치는 vector_configs에서 동적으로 로드됨)
+        val results = vectorChunkRepository.findByWeightedFieldScore(queryVector, "posts", "Post", 10)
 
         // Then: 결과 검증 (title 필드가 더 높은 가중치)
         assertThat(results).isNotEmpty

@@ -73,30 +73,27 @@ interface VectorChunkMapper {
     ): List<ChunkDetail>
 
     /**
-     * 필드별 가중치 적용 검색 (CTE + CASE WHEN)
+     * 필드별 가중치 적용 검색 (T027: vector_configs JOIN)
      *
-     * CTE와 CASE WHEN을 사용하여 필드별로 서로 다른 가중치를 적용합니다.
-     * JPQL로도 CASE WHEN은 가능하지만 CTE가 필요하므로 MyBatis 사용합니다.
+     * CTE와 vector_configs 테이블 JOIN을 사용하여 동적으로 필드별 가중치 및 임계값을 적용합니다.
+     * Constitution Principle II, III 준수: 필드별 벡터화 및 가중치 설정, 스코어 임계값 필터링
      *
      * SQL 특징:
      * - CTE: 복잡한 계산 결과 집합 생성
-     * - CASE WHEN field_name: 필드별 가중치 적용
+     * - INNER JOIN vector_configs: 활성화된 필드 설정에서 weight, threshold 동적 적용
+     * - WHERE field_max_score >= threshold: Constitution Principle III (임계값 필터링)
      * - Dynamic WHERE: nullable 파라미터 필터링
      *
      * @param queryVector 검색 벡터
      * @param namespace 네임스페이스 필터 (nullable)
-     * @param entity 엔티티 필터 (nullable)
-     * @param titleWeight title 필드 가중치
-     * @param contentWeight content 필드 가중치
+     * @param entity 엔티티 필터 (필수)
      * @param limit 결과 개수 제한
-     * @return 필드별 가중치가 적용된 스코어 목록
+     * @return 필드별 가중치가 적용된 스코어 목록 (임계값 필터링 완료)
      */
     fun findByWeightedFieldScore(
         @Param("queryVector") queryVector: FloatArray,
         @Param("namespace") namespace: String?,
-        @Param("entity") entity: String?,
-        @Param("titleWeight") titleWeight: Double,
-        @Param("contentWeight") contentWeight: Double,
+        @Param("entity") entity: String,
         @Param("limit") limit: Int
     ): List<WeightedScore>
 

@@ -2,6 +2,7 @@ package me.muheun.moaspace.service
 
 import me.muheun.moaspace.domain.post.Post
 import me.muheun.moaspace.dto.CreatePostRequest
+import me.muheun.moaspace.dto.PostSearchRequest
 import me.muheun.moaspace.dto.UpdatePostRequest
 import me.muheun.moaspace.repository.PostRepository
 import me.muheun.moaspace.repository.UserRepository
@@ -20,7 +21,8 @@ import org.springframework.transaction.annotation.Transactional
 class PostService(
     private val postRepository: PostRepository,
     private val userRepository: UserRepository,
-    private val vectorIndexingService: VectorIndexingService
+    private val vectorIndexingService: VectorIndexingService,
+    private val vectorSearchService: VectorSearchService
 ) {
 
     private val logger = LoggerFactory.getLogger(PostService::class.java)
@@ -352,5 +354,41 @@ class PostService(
         postRepository.save(post)
 
         logger.info("게시글 소프트 삭제 완료: postId=$postId (deleted=true)")
+    }
+
+    /**
+     * 게시글 벡터 검색 (T028: 멀티필드 가중치 검색)
+     *
+     * VectorSearchService를 통해 필드별 가중치 기반 유사도 검색을 수행하고,
+     * 스코어 순으로 정렬된 Post 엔티티 목록을 반환합니다.
+     *
+     * Constitution Principle II: 필드별 가중치 설정 (vector_configs)
+     * Constitution Principle III: 스코어 임계값 필터링
+     *
+     * @param request 검색 요청 (query, threshold, limit)
+     * @return List<Post> 스코어 순으로 정렬된 게시글 목록 (삭제된 글 제외)
+     */
+    fun searchPosts(request: PostSearchRequest): List<Post> {
+        logger.info("게시글 벡터 검색 시작: query=${request.query}, limit=${request.limit}")
+
+        val postScores = vectorSearchService.searchPosts(request)
+        logger.debug("벡터 검색 결과: ${postScores.size}개 postId 반환")
+
+        if (postScores.isEmpty()) {
+            logger.info("검색 결과 없음")
+            return emptyList()
+        }
+
+        val postIds = postScores.keys.toList()
+        val posts = postRepository.findAllById(postIds)
+            .filter { !it.deleted }
+            .associateBy { it.id }
+
+        val sortedPosts = postIds.mapNotNull { postId ->
+            posts[postId]
+        }
+
+        logger.info("게시글 벡터 검색 완료: ${sortedPosts.size}개 게시글 반환")
+        return sortedPosts
     }
 }

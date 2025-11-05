@@ -59,31 +59,26 @@ class VectorChunkCustomRepositoryImpl(
         return results
     }
 
-    // 필드별 가중치 적용 검색
+    // 필드별 가중치 적용 검색 (T027: vector_configs JOIN)
     override fun findByWeightedFieldScore(
         queryVector: FloatArray,
         namespace: String,
         entity: String,
-        titleWeight: Double,
-        contentWeight: Double,
         limit: Int
     ): List<WeightedScore> {
-        logger.debug("findByWeightedFieldScore 호출: vectorSize={}, namespace={}, entity={}, titleWeight={}, contentWeight={}, limit={}",
-            queryVector.size, namespace, entity, titleWeight, contentWeight, limit)
+        logger.debug("findByWeightedFieldScore 호출: vectorSize={}, namespace={}, entity={}, limit={}",
+            queryVector.size, namespace, entity, limit)
 
         val results = vectorChunkMapper.findByWeightedFieldScore(
             queryVector,
             namespace,
             entity,
-            titleWeight,
-            contentWeight,
             limit
         )
 
-        logger.info("findByWeightedFieldScore 완료: 검색된 스코어 수={}, title 결과={}, content 결과={}",
+        logger.info("findByWeightedFieldScore 완료: 검색된 스코어 수={}, 필드별 분포={}",
             results.size,
-            results.count { it.fieldName == "title" },
-            results.count { it.fieldName == "content" })
+            results.groupBy { it.fieldName }.mapValues { it.value.size })
 
         return results
     }

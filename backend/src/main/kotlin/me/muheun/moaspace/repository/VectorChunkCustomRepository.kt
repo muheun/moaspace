@@ -94,49 +94,50 @@ interface VectorChunkCustomRepository {
     ): List<ChunkDetail>
 
     /**
-     * 필드별 가중치 벡터 검색
+     * 필드별 가중치 벡터 검색 (T027: vector_configs JOIN)
      *
-     * 기존 Native Query:
+     * MyBatis XML로 구현되며 vector_configs 테이블과 JOIN하여 동적으로 가중치 및 임계값을 적용합니다.
+     * Constitution Principle II, III 준수:
+     * - 필드별 가중치 설정 (vector_configs.weight)
+     * - 스코어 임계값 필터링 (vector_configs.threshold)
+     *
+     * MyBatis 쿼리:
      * ```sql
      * WITH field_scores AS (
      *     SELECT v.record_key, v.field_name,
-     *            MAX(1 - (v.chunk_vector <=> CAST(:queryVector AS vector))) as score
-     *     FROM vector_chunk v
+     *            MAX(1 - (v.chunk_vector <=> CAST(:queryVector AS vector))) AS field_max_score
+     *     FROM vector_chunks v
      *     WHERE v.chunk_vector IS NOT NULL
      *       AND v.namespace = :namespace
      *       AND v.entity = :entity
-     *       AND v.field_name IN ('title', 'content')
      *     GROUP BY v.record_key, v.field_name
+     * ),
+     * weighted_scores AS (
+     *     SELECT fs.record_key, fs.field_name, fs.field_max_score, vc.weight, vc.threshold,
+     *            (fs.field_max_score * vc.weight) AS weighted_score
+     *     FROM field_scores fs
+     *     INNER JOIN vector_configs vc
+     *         ON vc.entity_type = :entity
+     *         AND vc.field_name = fs.field_name
+     *         AND vc.enabled = TRUE
+     *     WHERE fs.field_max_score >= vc.threshold
      * )
-     * SELECT record_key as recordKey,
-     *        SUM(CASE
-     *            WHEN field_name = 'title' THEN score * :titleWeight
-     *            WHEN field_name = 'content' THEN score * :contentWeight
-     *            ELSE score
-     *        END) as weightedScore
-     * FROM field_scores
-     * GROUP BY record_key
-     * ORDER BY weightedScore DESC
+     * SELECT ws.record_key, ws.field_name, ws.weighted_score
+     * FROM weighted_scores ws
+     * ORDER BY ws.weighted_score DESC
      * LIMIT :limit
      * ```
-     *
-     * Kotlin JDSL 변환: 서브쿼리 + CASE WHEN 표현식
-     * (Constitution Principle II 필드별 가중치 지원)
      *
      * @param queryVector 검색 벡터 (768차원)
      * @param namespace 네임스페이스 (필수)
      * @param entity 엔티티 (필수)
-     * @param titleWeight 제목 가중치 (기본값 2.0)
-     * @param contentWeight 내용 가중치 (기본값 1.0)
      * @param limit 결과 개수 제한
-     * @return 가중치 적용 스코어 목록
+     * @return 가중치 적용 스코어 목록 (임계값 필터링 완료)
      */
     fun findByWeightedFieldScore(
         queryVector: FloatArray,
         namespace: String,
         entity: String,
-        titleWeight: Double = 2.0,
-        contentWeight: Double = 1.0,
         limit: Int
     ): List<WeightedScore>
 

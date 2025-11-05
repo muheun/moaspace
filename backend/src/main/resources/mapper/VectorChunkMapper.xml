@@ -62,7 +62,7 @@
         LIMIT #{limit}
     </select>
 
-    <!-- 필드별 가중치 적용 검색 (T003: Phase 1 개선) -->
+    <!-- 필드별 가중치 적용 검색 (T027: Phase 4 개선 - vector_configs JOIN) -->
     <!-- Constitution Principle II, III: 필드별 가중치 및 임계값 필터링 -->
     <!-- SC-003: title weight=3.0 → content 대비 최소 2배 이상 높은 스코어 -->
     <!-- SC-006: threshold=0.7 → 0.65 제외 (임계값 경계 테스트) -->
@@ -84,18 +84,20 @@
             GROUP BY v.record_key, v.field_name
         ),
         weighted_scores AS (
-            -- Step 2: 파라미터 가중치 적용 (titleWeight, contentWeight)
+            -- Step 2: vector_configs에서 가중치 및 임계값 적용
             SELECT
                 fs.record_key,
                 fs.field_name,
-                (fs.field_max_score *
-                    CASE
-                        WHEN fs.field_name = 'title' THEN #{titleWeight}
-                        WHEN fs.field_name = 'content' THEN #{contentWeight}
-                        ELSE 1.0
-                    END
-                ) AS weighted_score
+                fs.field_max_score,
+                vc.weight,
+                vc.threshold,
+                (fs.field_max_score * vc.weight) AS weighted_score
             FROM field_scores fs
+            INNER JOIN vector_configs vc
+                ON vc.entity_type = #{entity}
+                AND vc.field_name = fs.field_name
+                AND vc.enabled = TRUE
+            WHERE fs.field_max_score &gt;= vc.threshold
         )
         -- Step 3: 필드별 가중치 스코어 반환
         SELECT
@@ -103,7 +105,7 @@
             ws.field_name AS fieldName,
             ws.weighted_score AS weightedScore
         FROM weighted_scores ws
-        ORDER BY ws.record_key, ws.weighted_score DESC
+        ORDER BY ws.weighted_score DESC, ws.record_key
         LIMIT #{limit}
     </select>
 
