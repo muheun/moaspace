@@ -6,15 +6,6 @@ import me.muheun.moaspace.service.VectorSearchService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
-/**
- * 범용 벡터 검색 API (T029)
- *
- * 필드별 가중치 기반 멀티필드 검색을 제공합니다.
- * vector_configs 테이블 설정에 따라 동적으로 가중치 및 임계값이 적용됩니다.
- *
- * Constitution Principle II: 필드별 가중치 설정 지원
- * Constitution Principle III: 스코어 임계값 필터링
- */
 @RestController
 @RequestMapping("/api/vector-search")
 class VectorSearchController(

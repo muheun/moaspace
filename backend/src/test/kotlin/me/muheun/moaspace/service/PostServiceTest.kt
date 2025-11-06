@@ -19,17 +19,6 @@ import org.springframework.test.context.jdbc.Sql
 import org.springframework.transaction.annotation.Transactional
 import jakarta.persistence.EntityManager
 
-/**
- * PostService 통합 테스트
- *
- * Constitution Principle V 준수:
- * - 실제 DB 연동 (@SpringBootTest + @Transactional)
- * - Mock 금지 (모든 의존성 실제 빈 사용)
- *
- * 테스트 범위:
- * - T023: Post 생성 시 자동 벡터화 검증
- * - Post 수정 시 벡터 재생성 검증
- */
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
@@ -68,17 +57,9 @@ class PostServiceTest @Autowired constructor(
         )
     }
 
-    /**
-     * T023-1: createPost - Post 생성 시 자동 벡터화 (title + content)
-     *
-     * Given: Post.title, Post.content 설정 enabled=true
-     * When: createPost(title="제목", contentHtml="<p>본문</p>")
-     * Then:
-     *   - Post 엔티티 저장 성공
-     *   - VectorChunk 2개 생성 (title + content)
-     */
+    
     @Test
-    @DisplayName("T023-1: createPost - Post 생성 시 자동 벡터화")
+    @DisplayName("Post 생성 시 자동 벡터화")
     fun testCreatePostWithAutoVectorization() {
         // given: VectorConfig 설정
         vectorConfigRepository.save(
@@ -118,17 +99,9 @@ class PostServiceTest @Autowired constructor(
         assertThat(contentChunk?.chunkText).contains("테스트 게시글 본문 내용입니다")
     }
 
-    /**
-     * T023-2: createPost - VectorConfig 없을 때 벡터화 건너뛰기
-     *
-     * Given: VectorConfig 설정 없음
-     * When: createPost()
-     * Then:
-     *   - Post 엔티티 저장 성공
-     *   - VectorChunk 0개 생성
-     */
+    
     @Test
-    @DisplayName("T023-2: createPost - VectorConfig 없을 때 벡터화 건너뛰기")
+    @DisplayName("VectorConfig 없을 때 벡터화 건너뛰기")
     fun testCreatePostWithoutVectorConfig() {
         // given: VectorConfig 설정 없음
 
@@ -149,17 +122,9 @@ class PostServiceTest @Autowired constructor(
         assertThat(chunks).isEmpty()
     }
 
-    /**
-     * T023-3: updatePost - Post 수정 시 벡터 재생성
-     *
-     * Given: Post 이미 존재, VectorChunk 2개 (title + content)
-     * When: updatePost(title="수정된 제목", contentHtml="<p>수정된 본문</p>")
-     * Then:
-     *   - Post 업데이트 성공
-     *   - 기존 VectorChunk 삭제 → 새 VectorChunk 2개 생성
-     */
+    
     @Test
-    @DisplayName("T023-3: updatePost - Post 수정 시 벡터 재생성")
+    @DisplayName("Post 수정 시 벡터 재생성")
     fun testUpdatePostWithVectorReindexing() {
         // given: VectorConfig 설정 + Post 생성
         vectorConfigRepository.save(
@@ -205,15 +170,9 @@ class PostServiceTest @Autowired constructor(
         assertThat(contentChunk?.chunkText).contains("수정된 본문")
     }
 
-    /**
-     * T023-4: createPost - title만 벡터화 설정된 경우
-     *
-     * Given: Post.title만 enabled=true, Post.content는 enabled=false
-     * When: createPost()
-     * Then: title만 벡터화 (VectorChunk 1개)
-     */
+    
     @Test
-    @DisplayName("T023-4: createPost - title만 벡터화 설정된 경우")
+    @DisplayName("title만 벡터화 설정된 경우")
     fun testCreatePostWithPartialVectorization() {
         // given: title만 enabled
         vectorConfigRepository.save(
@@ -239,15 +198,9 @@ class PostServiceTest @Autowired constructor(
         assertThat(chunks[0].chunkText).isEqualTo("제목만 벡터화")
     }
 
-    /**
-     * T023-5: createPost - HTML → PlainText 변환 검증
-     *
-     * Given: contentHtml에 HTML 태그 포함
-     * When: createPost()
-     * Then: VectorChunk.chunkText는 순수 텍스트 (HTML 태그 제거됨)
-     */
+    
     @Test
-    @DisplayName("T023-5: createPost - HTML → PlainText 변환 검증")
+    @DisplayName("HTML → PlainText 변환 검증")
     fun testCreatePostHtmlToPlainTextConversion() {
         // given
         vectorConfigRepository.save(
@@ -274,17 +227,9 @@ class PostServiceTest @Autowired constructor(
         assertThat(contentChunk?.chunkText).contains("굵은글씨")
     }
 
-    /**
-     * T023-6: createPost - 대용량 content 청킹 검증
-     *
-     * Given: Post.content 설정 enabled=true
-     * When: createPost(contentHtml="<p>" + 2000자 + "</p>")
-     * Then:
-     *   - Post 저장 성공
-     *   - content 필드에서 여러 청크 생성 (2000자 → 약 5개)
-     */
+    
     @Test
-    @DisplayName("T023-6: createPost - 대용량 content 청킹 검증")
+    @DisplayName("대용량 content 청킹 검증")
     fun testCreatePostWithLargeContent() {
         // given
         vectorConfigRepository.save(

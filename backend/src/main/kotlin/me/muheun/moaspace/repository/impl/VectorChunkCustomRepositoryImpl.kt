@@ -10,7 +10,6 @@ import me.muheun.moaspace.repository.VectorChunkCustomRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Repository
 
-// 벡터 청크 검색 및 삭제
 @Repository
 class VectorChunkCustomRepositoryImpl(
     private val jpaQueryFactory: JPAQueryFactory,
@@ -22,7 +21,6 @@ class VectorChunkCustomRepositoryImpl(
         private val logger = LoggerFactory.getLogger(VectorChunkCustomRepositoryImpl::class.java)
     }
 
-    // 레코드별 유사도 검색
     override fun findSimilarRecords(
         queryVector: FloatArray,
         namespace: String?,
@@ -40,7 +38,6 @@ class VectorChunkCustomRepositoryImpl(
         return results
     }
 
-    // 청크 상세 정보 검색
     override fun findTopChunksByRecord(
         queryVector: FloatArray,
         namespace: String?,
@@ -59,7 +56,6 @@ class VectorChunkCustomRepositoryImpl(
         return results
     }
 
-    // 필드별 가중치 적용 검색 (T027: vector_configs JOIN)
     override fun findByWeightedFieldScore(
         queryVector: FloatArray,
         namespace: String,
@@ -83,7 +79,6 @@ class VectorChunkCustomRepositoryImpl(
         return results
     }
 
-    // 필터 기반 벡터 청크 삭제
     override fun deleteByFilters(
         namespace: String,
         entity: String,

@@ -7,20 +7,6 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 
-/**
- * VectorChunk 리포지토리 (MyBatis 마이그레이션 완료)
- *
- * JpaRepository + VectorChunkCustomRepository 통합:
- * - JpaRepository: 기본 CRUD 메서드 (findById, save, delete 등)
- * - VectorChunkCustomRepository: MyBatis 기반 Custom 메서드 (벡터 검색, 동적 삭제)
- *   - VectorChunkMapper는 CustomRepositoryImpl에서 직접 주입받아 사용
- *
- * Constitution Principle VI 준수:
- * - Native Query 제거 완료 (아래 주석 처리된 메서드 참조)
- * - MyBatis Mapper 사용 (pgvector 연산자, CTE, Window Function)
- *
- * Phase 2 (User Story 1): VectorChunk MyBatis 마이그레이션 완료
- */
 @Repository
 interface VectorChunkRepository :
     JpaRepository<VectorChunk, Long>,

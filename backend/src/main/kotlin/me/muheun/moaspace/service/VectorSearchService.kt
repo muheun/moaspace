@@ -7,18 +7,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-/**
- * 범용 벡터 검색 서비스 (T026)
- *
- * vector_configs 설정에 따라 필드별 가중치를 적용하여 멀티필드 검색을 수행합니다.
- * MyBatis 쿼리에서 vector_configs JOIN을 통해 동적으로 가중치 및 임계값 적용됩니다.
- *
- * Constitution Principle II: 필드별 벡터화 및 가중치 설정 지원
- * Constitution Principle III: 스코어 임계값 필터링 구현
- *
- * Success Criteria SC-003: title weight=3.0 → content 대비 최소 2배 이상 높은 스코어
- * Success Criteria SC-006: threshold=0.7 → 0.65 제외 (임계값 경계 테스트)
- */
 @Service
 @Transactional(readOnly = true)
 class VectorSearchService(

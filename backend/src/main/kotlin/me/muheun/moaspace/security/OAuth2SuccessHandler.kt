@@ -13,19 +13,6 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationSu
 import org.springframework.stereotype.Component
 import org.springframework.web.util.UriComponentsBuilder
 
-/**
- * OAuth2 인증 성공 핸들러
- * T029: User 생성 및 JWT 발급을 위한 OAuth2SuccessHandler 구현
- *
- * Google OAuth 인증 성공 후 다음 작업 수행:
- * 1. OAuth2User에서 사용자 정보 추출 (email, name, picture)
- * 2. DB에 사용자 존재 확인 (findByEmail)
- * 3. 없으면 새 사용자 생성, 있으면 기존 사용자 사용
- * 4. JWT 액세스 토큰 생성
- * 5. 프론트엔드로 리다이렉트 (쿼리 파라미터로 토큰 전달)
- *
- * Constitution Principle V: 실제 DB 연동 테스트 필요
- */
 @Component
 class OAuth2SuccessHandler(
     private val userRepository: UserRepository,

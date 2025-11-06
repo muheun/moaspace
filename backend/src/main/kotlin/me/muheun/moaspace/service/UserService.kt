@@ -5,17 +5,6 @@ import me.muheun.moaspace.repository.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-/**
- * User 서비스
- * T030: 사용자 CRUD 작업을 위한 UserService 생성
- *
- * 주요 기능:
- * - 사용자 조회 (ID, 이메일)
- * - 사용자 생성
- * - 사용자 존재 여부 확인
- *
- * Constitution Principle V: 실제 DB 연동 테스트 필요
- */
 @Service
 @Transactional(readOnly = true)
 class UserService(

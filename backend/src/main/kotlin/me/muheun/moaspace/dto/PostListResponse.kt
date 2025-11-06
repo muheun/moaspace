@@ -3,12 +3,6 @@ package me.muheun.moaspace.dto
 import me.muheun.moaspace.domain.post.Post
 import org.springframework.data.domain.Page
 
-/**
- * 게시글 목록 응답 DTO (페이지네이션 포함)
- * T061: GET /api/posts 엔드포인트용
- *
- * Constitution Principle IX: frontend/types/api/post.ts의 PostListResponse와 수동 동기화 필요
- */
 data class PostListResponse(
     val posts: List<PostSummary>,
     val pagination: PaginationInfo

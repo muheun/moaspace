@@ -11,3 +11,6 @@
 
 -- VectorChunk 테이블 초기화
 TRUNCATE TABLE vector_chunks RESTART IDENTITY CASCADE;
+
+-- VectorConfig 테이블 초기화
+TRUNCATE TABLE vector_configs RESTART IDENTITY CASCADE;

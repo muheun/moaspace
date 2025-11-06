@@ -2,20 +2,6 @@ package me.muheun.moaspace.repository
 
 import me.muheun.moaspace.domain.vector.VectorConfig
 
-/**
- * VectorConfig 엔티티에 대한 Kotlin JDSL 기반 Custom Repository 인터페이스
- *
- * Constitution Principle VI 준수:
- * - JpaRepository 메서드 쿼리 우선
- * - 복잡한 동적 조건은 Kotlin JDSL 사용
- *
- * JPA CustomRepository 패턴:
- * 1. 이 인터페이스: 순수 메서드 시그니처 정의 (계약)
- * 2. VectorConfigCustomRepositoryImpl: 실제 Kotlin JDSL 쿼리 구현
- * 3. VectorConfigRepository: JpaRepository + Custom 통합
- *
- * Phase: 3 (선택적)
- */
 interface VectorConfigCustomRepository {
 
     /**

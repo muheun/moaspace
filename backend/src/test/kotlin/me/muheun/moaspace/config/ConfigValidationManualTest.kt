@@ -20,7 +20,6 @@ class ConfigValidationManualTest {
     @Test
     @DisplayName("벡터 차원이 최소값보다 작으면 명확한 오류 메시지와 함께 실패한다")
     fun shouldFailWithClearErrorMessageWhenVectorDimensionIsBelowMinimum() {
-        // Given: 잘못된 벡터 차원 (32 < 64)
         val config = TestEmbeddingConfig(
             modelPath = "./models/model.onnx",
             tokenizerPath = "./models/tokenizer.json",
@@ -47,7 +46,6 @@ class ConfigValidationManualTest {
     @Test
     @DisplayName("벡터 차원이 최대값보다 크면 명확한 오류 메시지와 함께 실패한다")
     fun shouldFailWithClearErrorMessageWhenVectorDimensionExceedsMaximum() {
-        // Given: 잘못된 벡터 차원 (8192 > 4096)
         val config = TestEmbeddingConfig(
             modelPath = "./models/model.onnx",
             tokenizerPath = "./models/tokenizer.json",
@@ -73,7 +71,6 @@ class ConfigValidationManualTest {
     @Test
     @DisplayName("최대 토큰 길이가 유효 범위를 벗어나면 명확한 오류 메시지와 함께 실패한다")
     fun shouldFailWithClearErrorMessageWhenMaxTokensIsOutOfRange() {
-        // Given: 잘못된 최대 토큰 길이 (16 < 32)
         val config = TestEmbeddingConfig(
             modelPath = "./models/model.onnx",
             tokenizerPath = "./models/tokenizer.json",
@@ -100,7 +97,6 @@ class ConfigValidationManualTest {
     @Test
     @DisplayName("모델 경로가 비어있으면 명확한 오류 메시지와 함께 실패한다")
     fun shouldFailWithClearErrorMessageWhenModelPathIsEmpty() {
-        // Given: 빈 모델 경로
         val config = TestEmbeddingConfig(
             modelPath = "",  // 🚨 빈 문자열
             tokenizerPath = "./models/tokenizer.json",
@@ -126,7 +122,6 @@ class ConfigValidationManualTest {
     @Test
     @DisplayName("올바른 설정값이면 검증이 성공한다")
     fun shouldPassValidationWhenAllConfigValuesAreValid() {
-        // Given: 올바른 설정값
         val config = TestEmbeddingConfig(
             modelPath = "./models/model.onnx",
             tokenizerPath = "./models/tokenizer.json",

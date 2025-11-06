@@ -14,19 +14,6 @@ import org.springframework.test.context.jdbc.Sql
 import org.springframework.transaction.annotation.Transactional
 import jakarta.persistence.EntityManager
 
-/**
- * VectorIndexingService 통합 테스트
- *
- * Constitution Principle V 준수:
- * - 실제 DB 연동 (@SpringBootTest + @Transactional)
- * - Mock 금지 (모든 의존성 실제 빈 사용)
- * - Edge Case 테스트 포함 (T024: 10,000자, T025: 빈 필드)
- *
- * 테스트 범위:
- * - T022: 필드별 벡터화 검증
- * - T024: 10,000자 content 청킹 검증 (SC-002)
- * - T025: 빈 필드 벡터화 건너뛰기 검증
- */
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
@@ -52,15 +39,9 @@ class VectorIndexingServiceTest @Autowired constructor(
         entityManager.clear()
     }
 
-    /**
-     * T022-1: indexEntity - 단일 필드 벡터화 테스트
-     *
-     * Given: Post.title 설정 enabled=true
-     * When: indexEntity(entityType="Post", recordKey="1", fields={title: "테스트 제목"})
-     * Then: 청크 1개 생성, chunkText="테스트 제목"
-     */
+    
     @Test
-    @DisplayName("T022-1: indexEntity - 단일 필드 벡터화 성공")
+    @DisplayName("단일 필드 벡터화 성공")
     fun testIndexEntitySingleField() {
         // given
         vectorConfigRepository.save(
@@ -86,15 +67,9 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(chunks[0].chunkText).isEqualTo("테스트 제목")
     }
 
-    /**
-     * T022-2: indexEntity - 여러 필드 동시 벡터화 테스트
-     *
-     * Given: Post.title, Post.content 설정 모두 enabled=true
-     * When: indexEntity(fields={title: "제목", content: "본문 내용"})
-     * Then: 청크 2개 생성 (필드별 1개씩)
-     */
+    
     @Test
-    @DisplayName("T022-2: indexEntity - 여러 필드 동시 벡터화")
+    @DisplayName("여러 필드 동시 벡터화")
     fun testIndexEntityMultipleFields() {
         // given
         vectorConfigRepository.save(
@@ -122,15 +97,9 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(chunks.map { it.fieldName }).containsExactlyInAnyOrder("title", "content")
     }
 
-    /**
-     * T022-3: indexEntity - enabled=false 필드 건너뛰기 테스트
-     *
-     * Given: Post.title(enabled=true), Post.content(enabled=false)
-     * When: indexEntity(fields={title: "제목", content: "본문"})
-     * Then: title만 벡터화 (청크 1개)
-     */
+    
     @Test
-    @DisplayName("T022-3: indexEntity - enabled=false 필드는 벡터화 건너뛰기")
+    @DisplayName("enabled=false 필드는 벡터화 건너뛰기")
     fun testIndexEntitySkipDisabledConfig() {
         // given
         vectorConfigRepository.save(
@@ -156,21 +125,10 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(chunks.map { it.fieldName }).containsOnly("title")
     }
 
-    /**
-     * T024: Edge Case - 10,000자 content 청킹 검증 (SC-002)
-     *
-     * Given: Post.content 설정 enabled=true
-     * When: indexEntity(fields={content: "10,000자 텍스트"})
-     * Then:
-     *   - 약 22개 청크 생성 (10,000 / (500-50) = 22.2개)
-     *   - 각 청크 크기 ≤ 500자
-     *   - 청크 간 50자 overlap 존재
-     *
-     * @Disabled: OutOfMemoryError 발생 (23개 청크 ONNX 추론 시 메모리 부족)
-     */
+    
     @org.junit.jupiter.api.Disabled("OutOfMemoryError: heap size 증가 또는 배치 처리 필요")
     @Test
-    @DisplayName("T024: Edge Case - 10,000자 content 청킹 검증 (SC-002)")
+    @DisplayName("Edge Case - 10,000자 content 청킹 검증 (SC-002)")
     fun testEdgeCaseLargeContentChunking() {
         // given
         vectorConfigRepository.save(
@@ -211,15 +169,9 @@ class VectorIndexingServiceTest @Autowired constructor(
         }
     }
 
-    /**
-     * T025: Edge Case - 빈 필드 벡터화 건너뛰기 검증
-     *
-     * Given: Post.title, Post.content 모두 enabled=true
-     * When: indexEntity(fields={title: "", content: "   "})
-     * Then: 청크 0개 생성 (모든 필드값이 blank)
-     */
+    
     @Test
-    @DisplayName("T025: Edge Case - 빈 필드 벡터화 건너뛰기")
+    @DisplayName("Edge Case - 빈 필드 벡터화 건너뛰기")
     fun testEdgeCaseSkipBlankFields() {
         // given
         vectorConfigRepository.save(
@@ -245,15 +197,9 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(chunks).isEmpty()
     }
 
-    /**
-     * T025-2: Edge Case - 일부 필드만 blank인 경우
-     *
-     * Given: Post.title, Post.content 모두 enabled=true
-     * When: indexEntity(fields={title: "제목", content: ""})
-     * Then: title만 벡터화 (청크 1개)
-     */
+    
     @Test
-    @DisplayName("T025-2: Edge Case - 일부 필드만 blank일 때 건너뛰기")
+    @DisplayName("Edge Case - 일부 필드만 blank일 때 건너뛰기")
     fun testEdgeCasePartialBlankFields() {
         // given
         vectorConfigRepository.save(
@@ -280,15 +226,9 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(chunks[0].fieldName).isEqualTo("title")
     }
 
-    /**
-     * T022-4: reindexEntity - 기존 청크 삭제 후 재생성 테스트
-     *
-     * Given: Post-1의 title, content 청크 이미 존재
-     * When: reindexEntity(recordKey="1", fields={title: "새 제목", content: "새 본문"})
-     * Then: 기존 청크 삭제 → 새 청크 2개 생성
-     */
+    
     @Test
-    @DisplayName("T022-4: reindexEntity - 기존 청크 삭제 후 재생성")
+    @DisplayName("기존 청크 삭제 후 재생성")
     fun testReindexEntity() {
         // given: 초기 인덱싱
         vectorConfigRepository.save(
@@ -324,15 +264,9 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(chunks.map { it.chunkText }).containsExactlyInAnyOrder("새 제목", "새 본문")
     }
 
-    /**
-     * T022-5: deleteEntityIndex - 엔티티의 모든 청크 삭제 테스트
-     *
-     * Given: Post-1의 title, content 청크 존재
-     * When: deleteEntityIndex(entityType="Post", recordKey="1")
-     * Then: Post-1의 모든 청크 삭제 (2개)
-     */
+    
     @Test
-    @DisplayName("T022-5: deleteEntityIndex - 엔티티의 모든 청크 삭제")
+    @DisplayName("엔티티의 모든 청크 삭제")
     fun testDeleteEntityIndex() {
         // given
         vectorConfigRepository.save(
@@ -363,15 +297,9 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(remainingChunks).isEmpty()
     }
 
-    /**
-     * T022-6: reindexField - 특정 필드만 재인덱싱 테스트
-     *
-     * Given: Post-1의 title, content 청크 존재
-     * When: reindexField(recordKey="1", fieldName="title", fieldValue="수정된 제목")
-     * Then: title 청크만 재생성, content 청크는 유지
-     */
+    
     @Test
-    @DisplayName("T022-6: reindexField - 특정 필드만 재인덱싱")
+    @DisplayName("특정 필드만 재인덱싱")
     fun testReindexField() {
         // given: 초기 인덱싱
         vectorConfigRepository.save(

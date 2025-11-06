@@ -18,15 +18,6 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 import jakarta.persistence.EntityManager
 
-/**
- * VectorSearchService 통합 테스트 (T031, T033, T034)
- *
- * T031: 가중치 계산 검증 (SC-003)
- * T033: 임계값 경계 검증 (SC-006)
- * T034: 필드 필터링 성능 검증 (SC-007)
- *
- * Constitution Principle V 준수: Real Database Integration + @Transactional rollback
- */
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
@@ -95,17 +86,9 @@ class VectorSearchServiceTest {
     // T031: 가중치 계산 검증 (SC-003)
     // ===========================
 
-    /**
-     * T031-1: title weight=3.0, content weight=1.0 → title 필드가 2배 이상 높은 스코어
-     *
-     * Given: title weight=3.0, content weight=1.0 설정
-     * When: "Kotlin 성능"이 title에만 있는 Post A vs content에만 있는 Post B 저장
-     * Then: Post A 스코어 > Post B 스코어 * 2 (최소 2배 이상 차이)
-     *
-     * Success Criteria SC-003: title weight=3.0 → content 대비 최소 2배 이상 높은 스코어
-     */
+    
     @Test
-    @DisplayName("T031-1: title 가중치(3.0)가 content 가중치(1.0) 대비 2배 이상 높은 스코어를 생성한다")
+    @DisplayName("title 가중치(3.0)가 content 가중치(1.0) 대비 2배 이상 높은 스코어를 생성한다")
     fun testWeightCalculationTitleVsContent() {
         // given
         val postA = postRepository.save(
@@ -182,15 +165,9 @@ class VectorSearchServiceTest {
         )
     }
 
-    /**
-     * T031-2: 범용 검색 API 정상 동작 검증
-     *
-     * Given: 여러 Post 저장 및 벡터화
-     * When: VectorSearchRequest로 검색
-     * Then: recordKey -> 가중치 스코어 Map 정상 반환
-     */
+    
     @Test
-    @DisplayName("T031-2: VectorSearchService.search()가 recordKey별 가중치 스코어를 정상 반환한다")
+    @DisplayName("VectorSearchService.search()가 recordKey별 가중치 스코어를 정상 반환한다")
     fun testGenericSearch() {
         // given
         val post1 = postRepository.save(
@@ -246,15 +223,9 @@ class VectorSearchServiceTest {
         assertThat(results[post1.id.toString()]).isGreaterThan(0.0)
     }
 
-    /**
-     * T031-3: Post 전용 검색 API 정상 동작 검증
-     *
-     * Given: Post 저장 및 벡터화
-     * When: PostSearchRequest로 검색
-     * Then: postId -> 가중치 스코어 Map 정상 반환 (Long 타입 키)
-     */
+    
     @Test
-    @DisplayName("T031-3: VectorSearchService.searchPosts()가 Post 전용 검색을 정상 수행한다")
+    @DisplayName("VectorSearchService.searchPosts()가 Post 전용 검색을 정상 수행한다")
     fun testPostSearch() {
         // given
         val post = postRepository.save(
@@ -292,20 +263,9 @@ class VectorSearchServiceTest {
     // T033: 임계값 경계 검증 (SC-006)
     // ===========================
 
-    /**
-     * T033-1: threshold=0.7일 때 score=0.65 결과 제외
-     *
-     * Given: Post.title threshold=0.7 설정 (VectorConfig 수정)
-     * When: 낮은 유사도 검색어로 검색 (score < 0.7)
-     * Then: 임계값 이하 결과 제외됨
-     *
-     * Success Criteria SC-006: threshold=0.7 → score=0.65 제외
-     *
-     * 참고: MyBatis 쿼리에서 vector_configs.threshold 적용하므로
-     *       0.7 이하 스코어는 쿼리 결과에서 제외됨
-     */
+    
     @Test
-    @DisplayName("T033-1: VectorConfig threshold=0.7 설정 시 낮은 스코어 결과가 제외된다")
+    @DisplayName("VectorConfig threshold=0.7 설정 시 낮은 스코어 결과가 제외된다")
     fun testThresholdBoundaryExclusion() {
         // given
         vectorConfigRepository.findAll().forEach { config ->
@@ -374,15 +334,9 @@ class VectorSearchServiceTest {
         }
     }
 
-    /**
-     * T033-2: threshold=0.0 (기본값)일 때 모든 결과 포함
-     *
-     * Given: Post.title threshold=0.0 설정 (기본값)
-     * When: 검색 수행
-     * Then: 낮은 스코어 결과도 포함됨 (0.0 초과)
-     */
+    
     @Test
-    @DisplayName("T033-2: threshold=0.0 (기본값) 설정 시 모든 스코어 결과가 포함된다")
+    @DisplayName("threshold=0.0 (기본값) 설정 시 모든 스코어 결과가 포함된다")
     fun testThresholdZeroIncludesAllResults() {
         // given
         val post1 = postRepository.save(
@@ -442,21 +396,9 @@ class VectorSearchServiceTest {
     // T034: 필드 필터링 성능 검증 (SC-007)
     // ===========================
 
-    /**
-     * T034-1: 필드 필터링 성능 검증 - 시간 단축 확인
-     *
-     * Given: 여러 Post 저장 및 벡터화
-     * When: 전체 검색 vs title만 검색
-     * Then: title만 검색 시 실행 시간이 30% 이상 단축됨
-     *
-     * Success Criteria SC-007: "제목만 검색" → 30% 시간 단축
-     *
-     * 참고: 현재 VectorSearchRequest.fieldName 파라미터는 있으나
-     *       MyBatis 쿼리에서 fieldName 필터링을 아직 구현하지 않음.
-     *       이 테스트는 향후 필터링 기능 추가 시 검증용으로 작성.
-     */
+    
     @Test
-    @DisplayName("T034-1: fieldName 필터링 시 검색 성능이 30% 이상 향상된다")
+    @DisplayName("fieldName 필터링 시 검색 성능이 30% 이상 향상된다")
     fun testFieldFilteringPerformance() {
         // given
         repeat(10) { i ->
@@ -517,19 +459,9 @@ class VectorSearchServiceTest {
         assertThat(titleOnlyResults).isNotEmpty
     }
 
-    /**
-     * T034-2: fieldName 필터링 결과 검증
-     *
-     * Given: Post 저장 및 벡터화
-     * When: fieldName="title" 필터로 검색
-     * Then: title 필드만 검색된 결과 반환
-     *
-     * 참고: 현재는 fieldName 필터링이 MyBatis 쿼리에서 구현되지 않아
-     *       전체 필드 검색과 동일한 결과 반환.
-     *       향후 필터링 구현 시 이 테스트 활성화 예정.
-     */
+    
     @Test
-    @DisplayName("T034-2: fieldName 파라미터로 특정 필드만 검색한다")
+    @DisplayName("fieldName 파라미터로 특정 필드만 검색한다")
     fun testFieldNameFiltering() {
         // given
         val post = postRepository.save(

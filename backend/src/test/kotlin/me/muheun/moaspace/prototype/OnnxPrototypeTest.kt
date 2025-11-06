@@ -10,27 +10,16 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
 import kotlin.math.sqrt
 
-/**
- * T002: DJL + ONNX Runtime 프로토타입 구현 및 검증
- *
- * MPNet-base-v2 모델(768차원)을 사용하여 임베딩 생성을 빠르게 검증합니다.
- *
- * **Acceptance Criteria:**
- * - "안녕하세요" 텍스트를 768차원 벡터로 변환
- * - L2 norm ≈ 1.0 검증
- * - 성능 측정 (50ms 이내 목표)
- * - 형태소 분석 기본 동작 확인
- */
 @SpringBootTest
-@ActiveProfiles("test")  // TestSecurityConfig 사용으로 OAuth2 설정 문제 해결
-@DisplayName("[T002] ONNX 프로토타입 테스트 - MPNet 768차원")
+@ActiveProfiles("test")
+@DisplayName("ONNX 임베딩 테스트")
 class OnnxPrototypeTest {
 
     @Autowired
     private lateinit var embeddingService: VectorEmbeddingService
 
     @Test
-    @DisplayName("AC1: '안녕하세요'를 768차원 벡터로 임베딩하고 L2 norm이 1.0이어야 한다")
+    @DisplayName("'안녕하세요'를 768차원 벡터로 임베딩하고 L2 norm이 1.0이어야 한다")
     fun shouldEmbedKoreanTextTo768DimensionalVectorWithL2NormOne() {
         // given
         val text = "안녕하세요"
@@ -40,12 +29,12 @@ class OnnxPrototypeTest {
         val embeddingArray = embedding.toArray().map { it.toFloat() }.toFloatArray()
 
         // then
-        println("📊 [AC1] 임베딩 결과:")
+        println("📊 임베딩 결과:")
         println("  - 텍스트: \"$text\"")
         println("  - 벡터 차원: ${embeddingArray.size}")
         println("  - 첫 5개 값: ${embeddingArray.take(5)}")
 
-        assertThat(embeddingArray.size).isEqualTo(768) // MPNet-base-v2는 768차원
+        assertThat(embeddingArray.size).isEqualTo(768) // multilingual-e5-base는 768차원
 
         // L2 norm = 1.0 ± 0.0001 검증
         val norm = sqrt(embeddingArray.sumOf { (it * it).toDouble() })
@@ -55,7 +44,7 @@ class OnnxPrototypeTest {
     }
 
     @Test
-    @DisplayName("AC2: 성능 테스트 - 단일 문장 임베딩이 50ms 이내여야 한다 (MPNet 기준)")
+    @DisplayName("단일 문장 임베딩이 50ms 이내여야 한다")
     fun shouldCompleteEmbeddingWithin50MsWhenProcessingSingleSentence() {
         // given
         val text = "Spring Boot는 Java 기반의 강력한 웹 프레임워크입니다."
@@ -79,19 +68,17 @@ class OnnxPrototypeTest {
         val minTime = times.minOrNull() ?: 0
         val maxTime = times.maxOrNull() ?: 0
 
-        println("📊 [AC2] 성능 테스트 결과 (단일 문장, MPNet 768차원)")
+        println("📊 성능 테스트 결과:")
         println("  - 평균 시간: ${avgTime}ms")
         println("  - 최소 시간: ${minTime}ms")
         println("  - 최대 시간: ${maxTime}ms")
         println("  - 목표: 50ms 이내")
-
-        // MPNet은 MiniLM보다 더 크므로 50ms 목표 (30ms에서 완화)
         assertThat(avgTime).describedAs("평균 임베딩 시간이 50ms를 초과했습니다")
             .isLessThanOrEqualTo(50.0)
     }
 
     @Test
-    @DisplayName("AC3: 의미적으로 유사한 텍스트는 높은 유사도를 가져야 한다")
+    @DisplayName("의미적으로 유사한 텍스트는 높은 유사도를 가져야 한다")
     fun shouldHaveHighSimilarityWhenTextsSemanticallyRelated() {
         // given
         val text1 = "Python 프로그래밍"
@@ -107,18 +94,16 @@ class OnnxPrototypeTest {
             embedding2.toArray().map { it.toFloat() }.toFloatArray()
         )
 
-        println("📊 [AC3] 의미 유사도 테스트:")
+        println("📊 의미 유사도 테스트:")
         println("  - 텍스트1: \"$text1\"")
         println("  - 텍스트2: \"$text2\"")
         println("  - 코사인 유사도: $similarity")
         println("  - 목표: ≥ 0.7")
-
-        // MPNet은 더 높은 품질의 임베딩을 생성하므로 0.7 이상 기대
         assertThat(similarity).isGreaterThanOrEqualTo(0.7)
     }
 
     @Test
-    @DisplayName("AC4: 다국어 텍스트 (한국어-영어)의 유사도를 검증한다")
+    @DisplayName("다국어 텍스트 (한국어-영어)의 유사도를 검증한다")
     fun shouldHandleMultilingualTextsWhenComparingKoreanAndEnglish() {
         // given
         val koreanText = "안녕하세요"
@@ -134,20 +119,14 @@ class OnnxPrototypeTest {
             englishEmbedding.toArray().map { it.toFloat() }.toFloatArray()
         )
 
-        println("📊 [AC4] 다국어 유사도 테스트:")
+        println("📊 다국어 유사도 테스트:")
         println("  - 한국어: \"$koreanText\"")
         println("  - 영어: \"$englishText\"")
         println("  - 코사인 유사도: $similarity")
-        println("  - 참고: MPNet은 다국어 지원 모델")
-
-        // MPNet은 다국어 지원이 뛰어나므로 0.6 이상 기대
         assertThat(similarity).describedAs("한국어-영어 번역 유사도가 낮습니다")
             .isGreaterThanOrEqualTo(0.6)
     }
 
-    /**
-     * 코사인 유사도 계산
-     */
     private fun cosineSimilarity(a: FloatArray, b: FloatArray): Double {
         require(a.size == b.size) { "벡터 차원이 일치해야 합니다" }
 

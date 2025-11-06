@@ -6,19 +6,6 @@ import me.muheun.moaspace.query.dto.WeightedScore
 import org.apache.ibatis.annotations.Mapper
 import org.apache.ibatis.annotations.Param
 
-/**
- * VectorChunk MyBatis Mapper 인터페이스
- *
- * QueryDSL/JPQL로 구현 불가능한 쿼리를 MyBatis XML로 처리합니다.
- * Constitution Principle VI v3.0.0 준수: QueryDSL 불가능 → MyBatis로 분리
- *
- * 처리하는 쿼리 타입:
- * - CTE (WITH 절): JPQL 미지원
- * - Window Function (ROW_NUMBER() OVER PARTITION BY): JPQL 미지원
- * - pgvector 연산자 (<=>): QueryDSL template으로 가능하나 MyBatis가 더 적합
- *
- * Mapper XML 위치: backend/src/main/resources/mapper/VectorChunkMapper.xml
- */
 @Mapper
 interface VectorChunkMapper {
 
@@ -72,24 +59,7 @@ interface VectorChunkMapper {
         @Param("limit") limit: Int
     ): List<ChunkDetail>
 
-    /**
-     * 필드별 가중치 적용 검색 (T027: vector_configs JOIN)
-     *
-     * CTE와 vector_configs 테이블 JOIN을 사용하여 동적으로 필드별 가중치 및 임계값을 적용합니다.
-     * Constitution Principle II, III 준수: 필드별 벡터화 및 가중치 설정, 스코어 임계값 필터링
-     *
-     * SQL 특징:
-     * - CTE: 복잡한 계산 결과 집합 생성
-     * - INNER JOIN vector_configs: 활성화된 필드 설정에서 weight, threshold 동적 적용
-     * - WHERE field_max_score >= threshold: Constitution Principle III (임계값 필터링)
-     * - Dynamic WHERE: nullable 파라미터 필터링
-     *
-     * @param queryVector 검색 벡터
-     * @param namespace 네임스페이스 필터 (nullable)
-     * @param entity 엔티티 필터 (필수)
-     * @param limit 결과 개수 제한
-     * @return 필드별 가중치가 적용된 스코어 목록 (임계값 필터링 완료)
-     */
+    
     fun findByWeightedFieldScore(
         @Param("queryVector") queryVector: FloatArray,
         @Param("namespace") namespace: String?,
@@ -97,22 +67,7 @@ interface VectorChunkMapper {
         @Param("limit") limit: Int
     ): List<WeightedScore>
 
-    /**
-     * 필터 기반 VectorChunk 삭제 (동적 DELETE)
-     *
-     * nullable fieldName 파라미터에 따라 DELETE 조건을 동적으로 변경합니다.
-     * MyBatis의 <if test="fieldName != null"> 구문으로 처리합니다.
-     *
-     * SQL 특징:
-     * - Dynamic DELETE: fieldName이 null이면 해당 조건 무시
-     * - Constitution VI 준수: 코드에 DELETE 문자열 없음, XML로 완전 분리
-     *
-     * @param namespace 네임스페이스
-     * @param entity 엔티티
-     * @param recordKey 레코드 키
-     * @param fieldName 필드명 (nullable, null이면 모든 필드 삭제)
-     * @return 삭제된 행 개수
-     */
+    
     fun deleteByFilters(
         @Param("namespace") namespace: String,
         @Param("entity") entity: String,

@@ -8,11 +8,7 @@ import org.springframework.transaction.annotation.Transactional
 
 /**
  * 범용 벡터 인덱싱 서비스
- *
  * vector_configs 설정에 따라 엔티티의 필드를 자동으로 벡터화합니다.
- * 새로운 엔티티 추가 시 코드 수정 없이 설정만으로 벡터화 가능합니다.
- *
- * Success Criteria SC-001: 새 엔티티 코드 수정 0줄
  */
 @Service
 @Transactional(readOnly = true)
