@@ -66,22 +66,35 @@ class VectorIndexingService(
             logger.debug("필드 '$fieldName' 청킹 완료: ${chunks.size}개 청크 생성")
 
             chunks.forEachIndexed { index, chunkText ->
-                val embedding = embeddingService.generateEmbedding(chunkText)
+                try {
+                    val embedding = embeddingService.generateEmbedding(chunkText)
 
-                val vectorChunk = VectorChunk(
-                    namespace = namespace,
-                    entity = entityType,
-                    recordKey = recordKey,
-                    fieldName = fieldName,
-                    chunkText = chunkText,
-                    chunkVector = embedding,
-                    chunkIndex = index,
-                    startPosition = index * (ChunkingService.DEFAULT_CHUNK_SIZE - ChunkingService.DEFAULT_OVERLAP),
-                    endPosition = (index * (ChunkingService.DEFAULT_CHUNK_SIZE - ChunkingService.DEFAULT_OVERLAP)) + chunkText.length
-                )
+                    val vectorChunk = VectorChunk(
+                        namespace = namespace,
+                        entity = entityType,
+                        recordKey = recordKey,
+                        fieldName = fieldName,
+                        chunkText = chunkText,
+                        chunkVector = embedding,
+                        chunkIndex = index,
+                        startPosition = index * (ChunkingService.DEFAULT_CHUNK_SIZE - ChunkingService.DEFAULT_OVERLAP),
+                        endPosition = (index * (ChunkingService.DEFAULT_CHUNK_SIZE - ChunkingService.DEFAULT_OVERLAP)) + chunkText.length
+                    )
 
-                vectorChunkRepository.saveAndFlush(vectorChunk)
-                totalChunks++
+                    vectorChunkRepository.saveAndFlush(vectorChunk)
+                    totalChunks++
+                } catch (e: Exception) {
+                    logger.error(
+                        "벡터화 실패: entityType=$entityType, recordKey=$recordKey, " +
+                        "fieldName=$fieldName, chunkIndex=$index, " +
+                        "chunkText='${chunkText.take(50)}...', error=${e.message}",
+                        e
+                    )
+                    throw RuntimeException(
+                        "벡터 인덱싱 중 오류 발생: fieldName=$fieldName, chunkIndex=$index",
+                        e
+                    )
+                }
             }
 
             logger.debug("필드 '$fieldName' 벡터화 완료: ${chunks.size}개 청크 저장")
@@ -210,5 +223,89 @@ class VectorIndexingService(
 
         logger.info("필드 재인덱싱 완료: 삭제=${deletedCount}개, 생성=${createdCount}개")
         return createdCount
+    }
+
+    /**
+     * 여러 엔티티를 배치로 벡터 인덱싱
+     *
+     * JDBC batch INSERT를 활용하여 대용량 데이터 처리 성능 최적화
+     * (application.yml: hibernate.jdbc.batch_size=50)
+     *
+     * @param entityType 엔티티 타입
+     * @param recordsFields 레코드별 필드 맵 리스트 (recordKey -> fields)
+     * @param namespace 네임스페이스
+     * @return 생성된 총 청크 개수
+     */
+    @Transactional
+    fun indexEntitiesBatch(
+        entityType: String,
+        recordsFields: List<Pair<String, Map<String, String>>>,
+        namespace: String = DEFAULT_NAMESPACE
+    ): Int {
+        logger.info("배치 벡터 인덱싱 시작: entityType=$entityType, records=${recordsFields.size}개, namespace=$namespace")
+
+        val enabledConfigs = vectorConfigService.findEnabledConfigsByEntityType(entityType)
+
+        if (enabledConfigs.isEmpty()) {
+            logger.warn("활성화된 벡터 설정이 없습니다: entityType=$entityType")
+            return 0
+        }
+
+        logger.debug("활성화된 설정 ${enabledConfigs.size}개 발견: ${enabledConfigs.map { it.fieldName }}")
+
+        val allChunks = mutableListOf<VectorChunk>()
+
+        // 1. 모든 VectorChunk 엔티티 생성 (배치 INSERT 준비)
+        for ((recordKey, fields) in recordsFields) {
+            for (config in enabledConfigs) {
+                val fieldName = config.fieldName
+                val fieldValue = fields[fieldName]
+
+                if (fieldValue.isNullOrBlank()) {
+                    continue
+                }
+
+                val chunks = chunkingService.chunkText(fieldValue)
+
+                chunks.forEachIndexed { index, chunkText ->
+                    try {
+                        val embedding = embeddingService.generateEmbedding(chunkText)
+
+                        val vectorChunk = VectorChunk(
+                            namespace = namespace,
+                            entity = entityType,
+                            recordKey = recordKey,
+                            fieldName = fieldName,
+                            chunkText = chunkText,
+                            chunkVector = embedding,
+                            chunkIndex = index,
+                            startPosition = index * (ChunkingService.DEFAULT_CHUNK_SIZE - ChunkingService.DEFAULT_OVERLAP),
+                            endPosition = (index * (ChunkingService.DEFAULT_CHUNK_SIZE - ChunkingService.DEFAULT_OVERLAP)) + chunkText.length
+                        )
+
+                        allChunks.add(vectorChunk)
+                    } catch (e: Exception) {
+                        logger.error(
+                            "벡터화 실패: entityType=$entityType, recordKey=$recordKey, " +
+                            "fieldName=$fieldName, chunkIndex=$index, " +
+                            "chunkText='${chunkText.take(50)}...', error=${e.message}",
+                            e
+                        )
+                        throw RuntimeException(
+                            "배치 벡터 인덱싱 중 오류 발생: recordKey=$recordKey, fieldName=$fieldName, chunkIndex=$index",
+                            e
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. JDBC batch INSERT 실행 (hibernate.jdbc.batch_size=50 활용)
+        logger.debug("배치 INSERT 실행: ${allChunks.size}개 청크")
+        vectorChunkRepository.saveAll(allChunks)
+        vectorChunkRepository.flush()
+
+        logger.info("배치 벡터 인덱싱 완료: entityType=$entityType, records=${recordsFields.size}개, 총 ${allChunks.size}개 청크 생성")
+        return allChunks.size
     }
 }

@@ -49,6 +49,12 @@ class PostServiceTest @Autowired constructor(
         entityManager.flush()
         entityManager.clear()
 
+        // VectorConfig 초기 데이터 생성
+        vectorConfigRepository.saveAll(listOf(
+            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, threshold = 0.0, enabled = true),
+            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, threshold = 0.0, enabled = true)
+        ))
+
         testUser = userRepository.save(
             User(
                 email = "test@example.com",
@@ -57,17 +63,11 @@ class PostServiceTest @Autowired constructor(
         )
     }
 
-    
+
     @Test
     @DisplayName("Post 생성 시 자동 벡터화")
     fun testCreatePostWithAutoVectorization() {
-        // given: VectorConfig 설정
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true)
-        )
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = true)
-        )
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨
 
         val request = CreatePostRequest(
             title = "테스트 게시글 제목",
@@ -99,11 +99,14 @@ class PostServiceTest @Autowired constructor(
         assertThat(contentChunk?.chunkText).contains("테스트 게시글 본문 내용입니다")
     }
 
-    
+
     @Test
     @DisplayName("VectorConfig 없을 때 벡터화 건너뛰기")
     fun testCreatePostWithoutVectorConfig() {
-        // given: VectorConfig 설정 없음
+        // given: VectorConfig 삭제 (설정 없음)
+        vectorConfigRepository.deleteAll()
+        entityManager.flush()
+        entityManager.clear()
 
         val request = CreatePostRequest(
             title = "설정 없는 게시글",
@@ -122,17 +125,11 @@ class PostServiceTest @Autowired constructor(
         assertThat(chunks).isEmpty()
     }
 
-    
+
     @Test
     @DisplayName("Post 수정 시 벡터 재생성")
     fun testUpdatePostWithVectorReindexing() {
-        // given: VectorConfig 설정 + Post 생성
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true)
-        )
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = true)
-        )
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨 + Post 생성
 
         val createRequest = CreatePostRequest(
             title = "원본 제목",
@@ -170,17 +167,23 @@ class PostServiceTest @Autowired constructor(
         assertThat(contentChunk?.chunkText).contains("수정된 본문")
     }
 
-    
+
     @Test
     @DisplayName("title만 벡터화 설정된 경우")
     fun testCreatePostWithPartialVectorization() {
-        // given: title만 enabled
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true)
-        )
-        vectorConfigRepository.save(
+        // given: 기존 설정 삭제 후 title만 enabled로 생성
+        vectorConfigRepository.deleteAll()
+        entityManager.flush()
+        entityManager.clear()
+        cacheManager.cacheNames.forEach { cacheName ->
+            cacheManager.getCache(cacheName)?.clear()
+        }
+        vectorConfigRepository.saveAll(listOf(
+            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true),
             VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = false)
-        )
+        ))
+        entityManager.flush()
+        entityManager.clear()
 
         val request = CreatePostRequest(
             title = "제목만 벡터화",
@@ -198,14 +201,11 @@ class PostServiceTest @Autowired constructor(
         assertThat(chunks[0].chunkText).isEqualTo("제목만 벡터화")
     }
 
-    
+
     @Test
     @DisplayName("HTML → PlainText 변환 검증")
     fun testCreatePostHtmlToPlainTextConversion() {
-        // given
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = true)
-        )
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨
 
         val request = CreatePostRequest(
             title = "HTML 테스트",
@@ -227,14 +227,11 @@ class PostServiceTest @Autowired constructor(
         assertThat(contentChunk?.chunkText).contains("굵은글씨")
     }
 
-    
+
     @Test
     @DisplayName("대용량 content 청킹 검증")
     fun testCreatePostWithLargeContent() {
-        // given
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = true)
-        )
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨
 
         // 2000자 텍스트
         val largeContent = "대용량 ".repeat(400) // 약 2000자
@@ -247,12 +244,15 @@ class PostServiceTest @Autowired constructor(
         // when
         val savedPost = postService.createPost(request, testUser.id!!)
 
-        // then: 여러 청크 생성
+        // then: 여러 청크 생성 (title 1개 + content 여러 개)
         val chunks = vectorChunkRepository.findAll()
-        assertThat(chunks.size).isGreaterThan(1) // 2000자 → 500자 청크 여러 개
+        assertThat(chunks.size).isGreaterThan(1)
 
-        // 모든 청크는 content 필드
-        assertThat(chunks.all { it.fieldName == "content" }).isTrue()
+        // content 청크만 필터링
+        val contentChunks = chunks.filter { it.fieldName == "content" }
+        assertThat(contentChunks.size).isGreaterThan(1) // content만으로도 여러 청크
+
+        // 모든 청크는 동일한 recordKey
         assertThat(chunks.all { it.recordKey == savedPost.id.toString() }).isTrue()
     }
 }

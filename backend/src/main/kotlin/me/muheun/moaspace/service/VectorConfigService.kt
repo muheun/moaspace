@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional
  * VectorConfig 비즈니스 로직 서비스
  *
  * 벡터 설정의 CRUD 작업 및 캐싱을 담당합니다.
- * 캐시는 5초 TTL로 설정되며, 설정 변경 시 자동으로 무효화됩니다.
+ * 캐시는 Caffeine (5분 TTL, 최대 1000개)로 설정되며, 설정 변경 시 자동으로 무효화됩니다.
  */
 @Service
 @Transactional(readOnly = true)

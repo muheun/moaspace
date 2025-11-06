@@ -27,8 +27,10 @@ spring:
 
   # Spring Cache 설정
   cache:
-    type: simple
+    type: caffeine
     cache-names: vectorConfig
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=5m
 
   jpa:
     hibernate:
@@ -96,6 +98,7 @@ vector:
     tokenizer-path: ${ONNX_TOKENIZER_PATH}
     dimension: 768
     max-tokens: 512
+    max-concurrent: 4  # Semaphore 최대 동시 실행 개수 (thread-safety 보장)
 
   # 벡터 인덱싱 설정
   indexing:

@@ -5,9 +5,11 @@ import me.muheun.moaspace.domain.post.Post
 import me.muheun.moaspace.domain.user.User
 import me.muheun.moaspace.dto.CreatePostRequest
 import me.muheun.moaspace.dto.UpdatePostRequest
+import me.muheun.moaspace.domain.vector.VectorConfig
 import me.muheun.moaspace.repository.PostRepository
 import me.muheun.moaspace.repository.UserRepository
 import me.muheun.moaspace.repository.VectorChunkRepository
+import me.muheun.moaspace.repository.VectorConfigRepository
 import me.muheun.moaspace.service.JwtTokenService
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -38,11 +40,27 @@ class PostControllerTest {
     @Autowired
     private lateinit var entityManager: EntityManager
 
+    @Autowired
+    private lateinit var cacheManager: org.springframework.cache.CacheManager
+
+    @Autowired
+    private lateinit var vectorConfigRepository: VectorConfigRepository
+
     @BeforeEach
     fun setUp() {
-        entityManager.createNativeQuery("TRUNCATE TABLE posts, vector_chunks, users RESTART IDENTITY CASCADE").executeUpdate()
+        cacheManager.cacheNames.forEach { cacheName ->
+            cacheManager.getCache(cacheName)?.clear()
+        }
+
+        entityManager.createNativeQuery("TRUNCATE TABLE posts, vector_chunks, users, vector_configs RESTART IDENTITY CASCADE").executeUpdate()
         entityManager.flush()
         entityManager.clear()
+
+        // VectorConfig 초기 데이터 생성
+        vectorConfigRepository.saveAll(listOf(
+            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, threshold = 0.0, enabled = true),
+            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, threshold = 0.0, enabled = true)
+        ))
     }
 
     @Autowired

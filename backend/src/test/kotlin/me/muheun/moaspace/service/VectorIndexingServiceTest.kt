@@ -37,16 +37,19 @@ class VectorIndexingServiceTest @Autowired constructor(
         entityManager.createNativeQuery("TRUNCATE TABLE vector_chunks RESTART IDENTITY CASCADE").executeUpdate()
         entityManager.flush()
         entityManager.clear()
+
+        // VectorConfig 초기 데이터 생성
+        vectorConfigRepository.saveAll(listOf(
+            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, threshold = 0.0, enabled = true),
+            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, threshold = 0.0, enabled = true)
+        ))
     }
 
-    
+
     @Test
     @DisplayName("단일 필드 벡터화 성공")
     fun testIndexEntitySingleField() {
-        // given
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true)
-        )
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨
 
         // when
         val chunkCount = vectorIndexingService.indexEntity(
@@ -67,17 +70,11 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(chunks[0].chunkText).isEqualTo("테스트 제목")
     }
 
-    
+
     @Test
     @DisplayName("여러 필드 동시 벡터화")
     fun testIndexEntityMultipleFields() {
-        // given
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true)
-        )
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = true)
-        )
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨
 
         // when
         val chunkCount = vectorIndexingService.indexEntity(
@@ -97,17 +94,23 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(chunks.map { it.fieldName }).containsExactlyInAnyOrder("title", "content")
     }
 
-    
+
     @Test
     @DisplayName("enabled=false 필드는 벡터화 건너뛰기")
     fun testIndexEntitySkipDisabledConfig() {
-        // given
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true)
-        )
-        vectorConfigRepository.save(
+        // given: 기존 설정 삭제 후 enabled=false로 재생성
+        vectorConfigRepository.deleteAll()
+        entityManager.flush()
+        entityManager.clear()
+        cacheManager.cacheNames.forEach { cacheName ->
+            cacheManager.getCache(cacheName)?.clear()
+        }
+        vectorConfigRepository.saveAll(listOf(
+            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true),
             VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = false)
-        )
+        ))
+        entityManager.flush()
+        entityManager.clear()
 
         // when
         val chunkCount = vectorIndexingService.indexEntity(
@@ -125,15 +128,58 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(chunks.map { it.fieldName }).containsOnly("title")
     }
 
-    
-    @org.junit.jupiter.api.Disabled("OutOfMemoryError: heap size 증가 또는 배치 처리 필요")
+    @Test
+    @DisplayName("메모리 프로파일링 - 10,000자 텍스트 처리 시 메모리 사용량 검증")
+    fun testMemoryUsageForLargeContent() {
+        val runtime = Runtime.getRuntime()
+
+        // GC 실행 및 대기
+        System.gc()
+        Thread.sleep(100)
+
+        // 초기 메모리 상태
+        val memoryBefore = runtime.totalMemory() - runtime.freeMemory()
+        val memoryBeforeMB = memoryBefore / 1024 / 1024
+
+        // 10,000자 텍스트 처리
+        val largeContent = "테스트 ".repeat(2000) // 10,000자 (한글 포함)
+
+        val chunkCount = vectorIndexingService.indexEntity(
+            entityType = "Post",
+            recordKey = "memory-test",
+            fields = mapOf("content" to largeContent)
+        )
+
+        // 최종 메모리 상태 (GC 후)
+        System.gc()
+        Thread.sleep(100)
+        val memoryAfter = runtime.totalMemory() - runtime.freeMemory()
+        val memoryAfterMB = memoryAfter / 1024 / 1024
+
+        val memoryIncreaseMB = memoryAfterMB - memoryBeforeMB
+
+        println("""
+            === 메모리 프로파일링 결과 ===
+            초기 메모리: ${memoryBeforeMB}MB
+            최종 메모리: ${memoryAfterMB}MB
+            메모리 증가량: ${memoryIncreaseMB}MB
+            생성된 청크 수: $chunkCount
+        """.trimIndent())
+
+        // 메모리 증가량이 150MB 이하인지 검증
+        assertThat(memoryIncreaseMB).isLessThan(150)
+            .withFailMessage("메모리 증가량이 너무 큽니다: ${memoryIncreaseMB}MB (목표: <150MB)")
+
+        // 청크 수 검증 (약 18-25개, 텍스트 내용에 따라 변동)
+        assertThat(chunkCount).isBetween(15, 30)
+            .withFailMessage("청크 수가 예상 범위를 벗어났습니다: ${chunkCount}개 (목표: 15-30개)")
+    }
+
+
     @Test
     @DisplayName("Edge Case - 10,000자 content 청킹 검증 (SC-002)")
     fun testEdgeCaseLargeContentChunking() {
-        // given
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = true)
-        )
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨
 
         // 10,000자 텍스트 생성
         val largeContent = "A".repeat(10000)
@@ -169,17 +215,11 @@ class VectorIndexingServiceTest @Autowired constructor(
         }
     }
 
-    
+
     @Test
     @DisplayName("Edge Case - 빈 필드 벡터화 건너뛰기")
     fun testEdgeCaseSkipBlankFields() {
-        // given
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true)
-        )
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = true)
-        )
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨
 
         // when: 모든 필드가 blank
         val chunkCount = vectorIndexingService.indexEntity(
@@ -197,17 +237,11 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(chunks).isEmpty()
     }
 
-    
+
     @Test
     @DisplayName("Edge Case - 일부 필드만 blank일 때 건너뛰기")
     fun testEdgeCasePartialBlankFields() {
-        // given
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true)
-        )
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = true)
-        )
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨
 
         // when
         val chunkCount = vectorIndexingService.indexEntity(
@@ -226,17 +260,11 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(chunks[0].fieldName).isEqualTo("title")
     }
 
-    
+
     @Test
     @DisplayName("기존 청크 삭제 후 재생성")
     fun testReindexEntity() {
-        // given: 초기 인덱싱
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true)
-        )
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = true)
-        )
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨 + 초기 인덱싱
 
         vectorIndexingService.indexEntity(
             entityType = "Post",
@@ -264,17 +292,11 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(chunks.map { it.chunkText }).containsExactlyInAnyOrder("새 제목", "새 본문")
     }
 
-    
+
     @Test
     @DisplayName("엔티티의 모든 청크 삭제")
     fun testDeleteEntityIndex() {
-        // given
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true)
-        )
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = true)
-        )
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨
 
         vectorIndexingService.indexEntity(
             entityType = "Post",
@@ -297,17 +319,11 @@ class VectorIndexingServiceTest @Autowired constructor(
         assertThat(remainingChunks).isEmpty()
     }
 
-    
+
     @Test
     @DisplayName("특정 필드만 재인덱싱")
     fun testReindexField() {
-        // given: 초기 인덱싱
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true)
-        )
-        vectorConfigRepository.save(
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = true)
-        )
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨 + 초기 인덱싱
 
         vectorIndexingService.indexEntity(
             entityType = "Post",

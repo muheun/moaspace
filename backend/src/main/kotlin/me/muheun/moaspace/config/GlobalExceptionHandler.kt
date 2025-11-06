@@ -3,6 +3,7 @@ package me.muheun.moaspace.config
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.validation.FieldError
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -79,11 +80,40 @@ class GlobalExceptionHandler {
     }
 
     /**
+     * 권한 거부 예외 처리
+     */
+    @ExceptionHandler(AccessDeniedException::class)
+    fun handleAccessDeniedException(ex: AccessDeniedException): ResponseEntity<ErrorResponse> {
+        logger.warn("권한 거부: ${ex.message}")
+
+        val errorResponse = ErrorResponse(
+            status = HttpStatus.FORBIDDEN.value(),
+            error = "Forbidden",
+            message = "접근 권한이 없습니다"
+        )
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse)
+    }
+
+    /**
+     * 런타임 예외 처리 (벡터 인덱싱 실패 등)
+     */
+    @ExceptionHandler(RuntimeException::class)
+    fun handleRuntimeException(ex: RuntimeException): ResponseEntity<ErrorResponse> {
+        logger.error("런타임 오류 발생: ${ex.javaClass.simpleName} - ${ex.message}", ex)
+
+        val errorResponse = ErrorResponse(
+            status = HttpStatus.INTERNAL_SERVER_ERROR.value(),
+            error = "Runtime Error",
+            message = ex.message ?: "처리 중 오류가 발생했습니다"
+        )
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse)
+    }
+
+    /**
      * 기타 모든 예외
      */
     @ExceptionHandler(Exception::class)
     fun handleGeneralException(ex: Exception): ResponseEntity<ErrorResponse> {
-        // 로깅 시스템을 통한 안전한 에러 기록
         logger.error("서버 내부 오류 발생: ${ex.javaClass.simpleName} - ${ex.message}", ex)
 
         val errorResponse = ErrorResponse(
