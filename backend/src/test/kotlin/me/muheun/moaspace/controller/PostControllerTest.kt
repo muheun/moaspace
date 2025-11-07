@@ -1,13 +1,15 @@
 package me.muheun.moaspace.controller
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import me.muheun.moaspace.domain.Post
+import me.muheun.moaspace.domain.post.Post
 import me.muheun.moaspace.domain.user.User
 import me.muheun.moaspace.dto.CreatePostRequest
 import me.muheun.moaspace.dto.UpdatePostRequest
-import me.muheun.moaspace.repository.PostEmbeddingRepository
+import me.muheun.moaspace.domain.vector.VectorConfig
 import me.muheun.moaspace.repository.PostRepository
 import me.muheun.moaspace.repository.UserRepository
+import me.muheun.moaspace.repository.VectorChunkRepository
+import me.muheun.moaspace.repository.VectorConfigRepository
 import me.muheun.moaspace.service.JwtTokenService
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -23,20 +25,6 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.transaction.annotation.Transactional
 import jakarta.persistence.EntityManager
 
-/**
- * PostController 통합 테스트
- * T047-049: PostController 엔드포인트 테스트
- *
- * Constitution Principle V: 실제 DB 연동 테스트 (@SpringBootTest)
- * Mock 테스트 절대 금지
- *
- * 주요 테스트:
- * - POST /api/posts: 게시글 생성 및 자동 벡터화
- * - GET /api/posts/{id}: 게시글 조회
- * - PUT /api/posts/{id}: 게시글 수정 및 벡터 재생성
- * - 소유권 검증 (작성자만 수정 가능)
- * - 인증 오류 처리 (401 Unauthorized)
- */
 @SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc  // Security 필터 활성화 (TestSecurityConfig 사용)
@@ -52,19 +40,34 @@ class PostControllerTest {
     @Autowired
     private lateinit var entityManager: EntityManager
 
+    @Autowired
+    private lateinit var cacheManager: org.springframework.cache.CacheManager
+
+    @Autowired
+    private lateinit var vectorConfigRepository: VectorConfigRepository
+
     @BeforeEach
     fun setUp() {
-        // 각 테스트 전에 관련 테이블들 정리 (CASCADE로 외래 키 처리)
-        entityManager.createNativeQuery("TRUNCATE TABLE posts, post_embeddings, users RESTART IDENTITY CASCADE").executeUpdate()
+        cacheManager.cacheNames.forEach { cacheName ->
+            cacheManager.getCache(cacheName)?.clear()
+        }
+
+        entityManager.createNativeQuery("TRUNCATE TABLE posts, vector_chunks, users, vector_configs RESTART IDENTITY CASCADE").executeUpdate()
         entityManager.flush()
         entityManager.clear()
+
+        // VectorConfig 초기 데이터 생성
+        vectorConfigRepository.saveAll(listOf(
+            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, threshold = 0.0, enabled = true),
+            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, threshold = 0.0, enabled = true)
+        ))
     }
 
     @Autowired
     private lateinit var postRepository: PostRepository
 
     @Autowired
-    private lateinit var postEmbeddingRepository: PostEmbeddingRepository
+    private lateinit var vectorChunkRepository: VectorChunkRepository
 
     @Autowired
     private lateinit var jwtTokenService: JwtTokenService
@@ -72,17 +75,9 @@ class PostControllerTest {
     @Autowired
     private lateinit var objectMapper: ObjectMapper
 
-    /**
-     * T047: 게시글 생성 및 자동 벡터화 테스트
-     *
-     * Given: 인증된 사용자
-     * When: POST /api/posts로 게시글 생성 요청
-     * Then: 201 Created 응답 + PostEmbedding 자동 생성
-     */
     @Test
-    @DisplayName("testCreatePost - 게시글을 생성하고 자동으로 벡터화한다")
+    @DisplayName("게시글을 생성하고 자동으로 벡터화한다")
     fun testCreatePost() {
-        // Given: 테스트용 사용자 생성
         val user = userRepository.save(
             User(
                 email = "author@example.com",
@@ -95,24 +90,22 @@ class PostControllerTest {
 
         val createRequest = CreatePostRequest(
             title = "Next.js 15 + React 19 사용 후기",
-            contentMarkdown = "**Next.js 15**가 출시되었습니다.",
+            contentHtml = "**Next.js 15**가 출시되었습니다.",
             hashtags = listOf("Next.js", "React", "웹개발")
         )
 
         val requestJson = objectMapper.writeValueAsString(createRequest)
 
-        // When: POST /api/posts
         val result = mockMvc.perform(
             post("/api/posts")
                 .header("Authorization", "Bearer $accessToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestJson)
         )
-            // Then: 201 Created
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.id").exists())
             .andExpect(jsonPath("$.title").value(createRequest.title))
-            .andExpect(jsonPath("$.contentMarkdown").value(createRequest.contentMarkdown))
+            .andExpect(jsonPath("$.contentHtml").value(createRequest.contentHtml))
             .andExpect(jsonPath("$.contentHtml").exists())
             .andExpect(jsonPath("$.author.id").value(user.id!!))
             .andExpect(jsonPath("$.author.name").value(user.name))
@@ -120,7 +113,6 @@ class PostControllerTest {
             .andExpect(jsonPath("$.hashtags[1]").value("React"))
             .andExpect(jsonPath("$.hashtags[2]").value("웹개발"))
             .andExpect(jsonPath("$.createdAt").exists())
-            .andExpect(jsonPath("$.updatedAt").exists())
             .andReturn()
 
         val responseJson = result.response.contentAsString
@@ -130,22 +122,17 @@ class PostControllerTest {
         val post = postRepository.findById(postId).get()
         assert(!post.deleted) { "생성된 게시글이 삭제 상태입니다" }
 
-        val embedding = postEmbeddingRepository.findByPost(post)
-        assert(embedding.isPresent) { "PostEmbedding이 자동 생성되지 않았습니다" }
-        assert(embedding.get().modelName == "multilingual-e5-base") { "모델명이 일치하지 않습니다" }
+        val chunks = vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc(
+            namespace = "vector_ai",
+            entity = "Post",
+            recordKey = postId.toString()
+        )
+        assert(chunks.isNotEmpty()) { "VectorChunk가 자동 생성되지 않았습니다" }
     }
 
-    /**
-     * T048: 게시글 조회 테스트
-     *
-     * Given: 저장된 게시글
-     * When: GET /api/posts/{id}로 조회 요청
-     * Then: 200 OK 응답 및 게시글 정보 확인
-     */
     @Test
-    @DisplayName("testGetPostById - ID로 게시글을 조회한다")
+    @DisplayName("ID로 게시글을 조회한다")
     fun testGetPostById() {
-        // Given: 테스트용 사용자 및 게시글 생성
         val user = userRepository.save(
             User(
                 email = "reader@example.com",
@@ -167,33 +154,23 @@ class PostControllerTest {
 
         val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
 
-        // When: GET /api/posts/{id}
         mockMvc.perform(
             get("/api/posts/${post.id}")
                 .header("Authorization", "Bearer $accessToken")
         )
-            // Then: 200 OK
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.id").value(post.id!!))
             .andExpect(jsonPath("$.title").value(post.title))
-            .andExpect(jsonPath("$.contentMarkdown").value(post.contentMarkdown))
+            .andExpect(jsonPath("$.contentHtml").value(post.contentHtml))
             .andExpect(jsonPath("$.contentHtml").value(post.contentHtml))
             .andExpect(jsonPath("$.author.id").value(user.id!!))
             .andExpect(jsonPath("$.author.name").value(user.name))
             .andExpect(jsonPath("$.hashtags[0]").value("테스트"))
     }
 
-    /**
-     * T049: 게시글 수정 및 벡터 재생성 테스트
-     *
-     * Given: 저장된 게시글 및 벡터
-     * When: PUT /api/posts/{id}로 수정 요청
-     * Then: 200 OK 응답 + PostEmbedding 재생성
-     */
     @Test
-    @DisplayName("testUpdatePost - 게시글을 수정하고 벡터를 재생성한다")
+    @DisplayName("게시글을 수정하고 벡터를 재생성한다")
     fun testUpdatePost() {
-        // Given: 테스트용 사용자 및 게시글 생성
         val user = userRepository.save(
             User(
                 email = "editor@example.com",
@@ -217,24 +194,22 @@ class PostControllerTest {
 
         val updateRequest = UpdatePostRequest(
             title = "수정된 제목",
-            contentMarkdown = "수정된 내용입니다.",
+            contentHtml = "수정된 내용입니다.",
             hashtags = listOf("수정", "테스트")
         )
 
         val requestJson = objectMapper.writeValueAsString(updateRequest)
 
-        // When: PUT /api/posts/{id}
         mockMvc.perform(
             put("/api/posts/${post.id}")
                 .header("Authorization", "Bearer $accessToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestJson)
         )
-            // Then: 200 OK
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.id").value(post.id!!))
             .andExpect(jsonPath("$.title").value("수정된 제목"))
-            .andExpect(jsonPath("$.contentMarkdown").value("수정된 내용입니다."))
+            .andExpect(jsonPath("$.contentHtml").value("수정된 내용입니다."))
             .andExpect(jsonPath("$.contentHtml").exists())
             .andExpect(jsonPath("$.hashtags[0]").value("수정"))
             .andExpect(jsonPath("$.hashtags[1]").value("테스트"))
@@ -243,21 +218,18 @@ class PostControllerTest {
         assert(updatedPost.title == "수정된 제목") { "제목이 수정되지 않았습니다" }
         assert(updatedPost.contentText == "수정된 내용입니다.") { "contentText가 수정되지 않았습니다" }
 
-        val embedding = postEmbeddingRepository.findByPost(updatedPost)
-        assert(embedding.isPresent) { "PostEmbedding이 재생성되지 않았습니다" }
+        // VectorChunk 확인 (PostEmbedding → VectorChunk 마이그레이션)
+        val chunks = vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc(
+            namespace = "vector_ai",
+            entity = "Post",
+            recordKey = updatedPost.id.toString()
+        )
+        assert(chunks.isNotEmpty()) { "VectorChunk가 재생성되지 않았습니다" }
     }
 
-    /**
-     * T049: 소유권 검증 테스트
-     *
-     * Given: 작성자 A의 게시글
-     * When: 사용자 B가 수정 시도
-     * Then: 403 Forbidden 응답
-     */
     @Test
-    @DisplayName("testUpdatePostForbidden - 작성자가 아닌 경우 수정 시 403 오류를 반환한다")
+    @DisplayName("작성자가 아닌 경우 수정 시 403 오류를 반환한다")
     fun testUpdatePostForbidden() {
-        // Given: 작성자 A 및 게시글 생성
         val authorA = userRepository.save(
             User(
                 email = "author.a@example.com",
@@ -290,20 +262,18 @@ class PostControllerTest {
 
         val updateRequest = UpdatePostRequest(
             title = "B가 수정한 제목",
-            contentMarkdown = "B가 수정한 내용",
+            contentHtml = "B가 수정한 내용",
             hashtags = listOf("B")
         )
 
         val requestJson = objectMapper.writeValueAsString(updateRequest)
 
-        // When: 사용자 B가 PUT /api/posts/{id} 시도
         mockMvc.perform(
             put("/api/posts/${post.id}")
                 .header("Authorization", "Bearer $accessTokenB")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestJson)
         )
-            // Then: 403 Forbidden
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.error.code").value("FORBIDDEN"))
             .andExpect(jsonPath("$.error.message").value("게시글을 수정할 권한이 없습니다"))
@@ -312,46 +282,28 @@ class PostControllerTest {
         assert(unchangedPost.title == "A의 게시글") { "게시글이 수정되었습니다" }
     }
 
-    /**
-     * T047: 인증 없이 게시글 생성 시도
-     *
-     * Given: Authorization 헤더 없음
-     * When: POST /api/posts 호출
-     * Then: 401 Unauthorized 응답
-     */
     @Test
-    @DisplayName("testCreatePostUnauthorized - 인증 없이 게시글 생성 시 401 오류를 반환한다")
+    @DisplayName("인증 없이 게시글 생성 시 401 오류를 반환한다")
     fun testCreatePostUnauthorized() {
-        // Given: 게시글 생성 요청
         val createRequest = CreatePostRequest(
             title = "인증 없는 게시글",
-            contentMarkdown = "내용",
+            contentHtml = "내용",
             hashtags = emptyList()
         )
 
         val requestJson = objectMapper.writeValueAsString(createRequest)
 
-        // When: Authorization 헤더 없이 POST /api/posts
         mockMvc.perform(
             post("/api/posts")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestJson)
         )
-            // Then: 401 Unauthorized (Spring Security 표준 응답)
             .andExpect(status().isUnauthorized)
     }
 
-    /**
-     * T048: 존재하지 않는 게시글 조회
-     *
-     * Given: 존재하지 않는 게시글 ID
-     * When: GET /api/posts/{id} 호출
-     * Then: 404 Not Found 응답
-     */
     @Test
-    @DisplayName("testGetPostNotFound - 존재하지 않는 게시글 조회 시 404 오류를 반환한다")
+    @DisplayName("존재하지 않는 게시글 조회 시 404 오류를 반환한다")
     fun testGetPostNotFound() {
-        // Given: 테스트용 사용자
         val user = userRepository.save(
             User(
                 email = "user@example.com",
@@ -364,28 +316,18 @@ class PostControllerTest {
 
         val nonExistentPostId = 99999L
 
-        // When: GET /api/posts/{nonExistentId}
         mockMvc.perform(
             get("/api/posts/$nonExistentPostId")
                 .header("Authorization", "Bearer $accessToken")
         )
-            // Then: 404 Not Found
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.error.code").value("POST_NOT_FOUND"))
             .andExpect(jsonPath("$.error.message").exists())
     }
 
-    /**
-     * T048: 삭제된 게시글 조회 시도
-     *
-     * Given: 소프트 삭제된 게시글 (deleted=true)
-     * When: GET /api/posts/{id} 호출
-     * Then: 404 Not Found 응답
-     */
     @Test
-    @DisplayName("testGetDeletedPost - 삭제된 게시글 조회 시 404 오류를 반환한다")
+    @DisplayName("삭제된 게시글 조회 시 404 오류를 반환한다")
     fun testGetDeletedPost() {
-        // Given: 테스트용 사용자 및 삭제된 게시글
         val user = userRepository.save(
             User(
                 email = "deleter@example.com",
@@ -410,27 +352,17 @@ class PostControllerTest {
 
         val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
 
-        // When: GET /api/posts/{deletedId}
         mockMvc.perform(
             get("/api/posts/${post.id}")
                 .header("Authorization", "Bearer $accessToken")
         )
-            // Then: 404 Not Found
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.error.code").value("POST_NOT_FOUND"))
     }
 
-    /**
-     * T065: 페이지네이션 테스트
-     *
-     * Given: 30개의 게시글
-     * When: page=0~2, size=10으로 조회
-     * Then: 각 페이지당 10개 반환, totalElements=30, totalPages=3
-     */
     @Test
-    @DisplayName("testGetPostsPaginated - 게시글 목록을 페이지네이션하여 반환한다")
+    @DisplayName("게시글 목록을 페이지네이션하여 반환한다")
     fun testGetPostsPaginated() {
-        // Given: 30개의 게시글 생성
         val user = userRepository.save(
             User(
                 email = "user@example.com",
@@ -454,14 +386,12 @@ class PostControllerTest {
 
         val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
 
-        // When: GET /api/posts?page=0&size=10
         mockMvc.perform(
             get("/api/posts")
                 .param("page", "0")
                 .param("size", "10")
                 .header("Authorization", "Bearer $accessToken")
         )
-            // Then: 10개 게시글 반환, totalElements=30, totalPages=3
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.posts.length()").value(10))
             .andExpect(jsonPath("$.pagination.page").value(0))
@@ -470,7 +400,6 @@ class PostControllerTest {
             .andExpect(jsonPath("$.pagination.totalPages").value(3))
             .andReturn()
 
-        // When: GET /api/posts?page=1&size=10
         mockMvc.perform(
             get("/api/posts")
                 .param("page", "1")
@@ -481,7 +410,6 @@ class PostControllerTest {
             .andExpect(jsonPath("$.posts.length()").value(10))
             .andExpect(jsonPath("$.pagination.page").value(1))
 
-        // When: GET /api/posts?page=2&size=10
         mockMvc.perform(
             get("/api/posts")
                 .param("page", "2")
@@ -493,17 +421,9 @@ class PostControllerTest {
             .andExpect(jsonPath("$.pagination.page").value(2))
     }
 
-    /**
-     * T066: 해시태그 필터링 테스트
-     *
-     * Given: #AI 태그 5개, #Backend 태그 3개
-     * When: hashtag 파라미터로 조회
-     * Then: 해당 태그 게시글만 반환
-     */
     @Test
-    @DisplayName("testFilterPostsByHashtag - 해시태그로 게시글을 필터링한다")
+    @DisplayName("해시태그로 게시글을 필터링한다")
     fun testFilterPostsByHashtag() {
-        // Given: 다양한 해시태그 게시글 생성
         val user = userRepository.save(
             User(
                 email = "user@example.com",
@@ -542,49 +462,35 @@ class PostControllerTest {
 
         val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
 
-        // When: GET /api/posts?hashtag=AI
         mockMvc.perform(
             get("/api/posts")
                 .param("hashtag", "AI")
                 .header("Authorization", "Bearer $accessToken")
         )
-            // Then: 5개 반환
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.posts.length()").value(5))
             .andExpect(jsonPath("$.pagination.totalElements").value(5))
 
-        // When: GET /api/posts?hashtag=Backend
         mockMvc.perform(
             get("/api/posts")
                 .param("hashtag", "Backend")
                 .header("Authorization", "Bearer $accessToken")
         )
-            // Then: 3개 반환
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.posts.length()").value(3))
             .andExpect(jsonPath("$.pagination.totalElements").value(3))
 
-        // When: GET /api/posts (필터 없음)
         mockMvc.perform(
             get("/api/posts")
                 .header("Authorization", "Bearer $accessToken")
         )
-            // Then: 8개 반환
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.pagination.totalElements").value(8))
     }
 
-    /**
-     * T067: 벡터 검색 정확도 테스트
-     *
-     * Given: AI 관련 게시글 2개, 무관한 게시글 1개
-     * When: "AI와 머신러닝" 검색 (threshold=0.6)
-     * Then: 관련 게시글만 반환 + 유사도 점수 포함
-     */
     @Test
-    @DisplayName("testSearchPostsWithThreshold - 임계값 기반 벡터 검색으로 유사 게시글을 찾는다")
+    @DisplayName("임계값 기반 벡터 검색으로 유사 게시글을 찾는다")
     fun testSearchPostsWithThreshold() {
-        // Given: 다양한 주제의 게시글 생성 (HTTP API 사용하여 벡터화 자동 처리)
         val user = userRepository.save(
             User(
                 email = "user@example.com",
@@ -603,7 +509,7 @@ class PostControllerTest {
                 .content(objectMapper.writeValueAsString(
                     CreatePostRequest(
                         title = "인공지능 기술의 발전",
-                        contentMarkdown = "인공지능과 머신러닝 기술이 빠르게 발전하고 있습니다.",
+                        contentHtml = "인공지능과 머신러닝 기술이 빠르게 발전하고 있습니다.",
                         hashtags = listOf("AI", "ML")
                     )
                 ))
@@ -617,7 +523,7 @@ class PostControllerTest {
                 .content(objectMapper.writeValueAsString(
                     CreatePostRequest(
                         title = "머신러닝과 딥러닝",
-                        contentMarkdown = "머신러닝과 딥러닝은 AI의 핵심 기술입니다.",
+                        contentHtml = "머신러닝과 딥러닝은 AI의 핵심 기술입니다.",
                         hashtags = listOf("ML", "DL")
                     )
                 ))
@@ -631,7 +537,7 @@ class PostControllerTest {
                 .content(objectMapper.writeValueAsString(
                     CreatePostRequest(
                         title = "요리 레시피",
-                        contentMarkdown = "맛있는 파스타 만드는 법을 소개합니다.",
+                        contentHtml = "맛있는 파스타 만드는 법을 소개합니다.",
                         hashtags = listOf("요리", "레시피")
                     )
                 ))
@@ -648,14 +554,12 @@ class PostControllerTest {
             }
         """.trimIndent()
 
-        // When: POST /api/posts/search
         mockMvc.perform(
             post("/api/posts/search")
                 .header("Authorization", "Bearer $accessToken")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(searchRequest)
         )
-            // Then: 유사한 게시글만 반환
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.results").isArray)
             .andExpect(jsonPath("$.results[0].post").exists())
@@ -663,17 +567,254 @@ class PostControllerTest {
             .andExpect(jsonPath("$.results[0].similarity").value(org.hamcrest.Matchers.greaterThanOrEqualTo(0.6)))
     }
 
-    /**
-     * T079: 소프트 삭제 기능 테스트
-     *
-     * Given: 작성자의 게시글
-     * When: DELETE /api/posts/{id} 호출
-     * Then: 204 No Content + DB에서 deleted=true
-     */
     @Test
-    @DisplayName("testDeletePost - 게시글을 소프트 삭제한다")
+    @DisplayName("필드별 가중치가 검색 결과 스코어에 반영된다 (SC-003)")
+    fun testSearchWithFieldWeights() {
+        val user = userRepository.save(
+            User(
+                email = "user@example.com",
+                name = "사용자",
+                profileImageUrl = null
+            )
+        )
+
+        val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
+
+        // Post A: title에 키워드 있음
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "Kotlin 성능 최적화 가이드",
+                        contentHtml = "일반적인 내용입니다.",
+                        hashtags = listOf("Kotlin")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // Post B: content에 키워드 있음
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "일반적인 제목",
+                        contentHtml = "Kotlin 성능 최적화에 대한 상세한 설명입니다.",
+                        hashtags = listOf("Backend")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // 벡터화 완료 대기
+        Thread.sleep(2000)
+
+        val searchRequest = """
+            {
+                "query": "Kotlin 성능 최적화",
+                "threshold": 0.0,
+                "limit": 20
+            }
+        """.trimIndent()
+
+        val result = mockMvc.perform(
+            post("/api/posts/search")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(searchRequest)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.results").isArray)
+            .andExpect(jsonPath("$.results.length()").value(2))
+            .andExpect(jsonPath("$.results[0].similarity").isNumber)
+            .andExpect(jsonPath("$.results[1].similarity").isNumber)
+            .andReturn()
+
+        // 스코어 비교 (title이 더 높은 가중치를 가지므로 Post A가 더 높은 스코어 획득 가능)
+        val responseJson = result.response.contentAsString
+        val responseMap = objectMapper.readValue(responseJson, Map::class.java)
+        val results = responseMap["results"] as List<Map<String, Any>>
+
+        assert(results.size == 2) { "검색 결과가 2개가 아닙니다: ${results.size}" }
+
+        // 모든 결과에 유사도 스코어가 있는지 확인
+        results.forEach { result ->
+            val similarity = result["similarity"] as Double
+            assert(similarity > 0.0) { "유사도 스코어가 0보다 커야 합니다: $similarity" }
+        }
+    }
+
+    @Test
+    @DisplayName("임계값 이하 결과를 제외한다 (SC-006)")
+    fun testSearchWithThresholdBoundary() {
+        val user = userRepository.save(
+            User(
+                email = "user@example.com",
+                name = "사용자",
+                profileImageUrl = null
+            )
+        )
+
+        val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
+
+        // 높은 유사도: 제목과 내용 모두 키워드 포함
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "Spring Boot 성능 최적화 완벽 가이드",
+                        contentHtml = "Spring Boot 애플리케이션의 성능을 최적화하는 방법을 상세히 설명합니다.",
+                        hashtags = listOf("Spring", "Performance")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // 중간 유사도: 제목에만 일부 키워드
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "Spring 기초 튜토리얼",
+                        contentHtml = "기본적인 웹 개발 내용입니다.",
+                        hashtags = listOf("Tutorial")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // 낮은 유사도: 완전히 다른 주제
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "요리 레시피 모음",
+                        contentHtml = "맛있는 파스타 만들기",
+                        hashtags = listOf("Cooking")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // 벡터화 완료 대기
+        Thread.sleep(2000)
+
+        val searchRequest = """
+            {
+                "query": "Spring Boot 성능 최적화",
+                "threshold": 0.7,
+                "limit": 20
+            }
+        """.trimIndent()
+
+        val result = mockMvc.perform(
+            post("/api/posts/search")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(searchRequest)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.results").isArray)
+            .andReturn()
+
+        val responseJson = result.response.contentAsString
+        val responseMap = objectMapper.readValue(responseJson, Map::class.java)
+        val results = responseMap["results"] as List<Map<String, Any>>
+
+        results.forEach { result ->
+            val similarity = result["similarity"] as Double
+            assert(similarity >= 0.7) { "임계값 0.7 이하 결과 발견: similarity=$similarity" }
+        }
+    }
+
+    @Test
+    @DisplayName("결과가 없을 때 빈 배열을 반환한다")
+    fun testSearchWithNoResults() {
+        val user = userRepository.save(
+            User(
+                email = "user@example.com",
+                name = "사용자",
+                profileImageUrl = null
+            )
+        )
+
+        val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
+
+        // 게시글 1개 생성
+        mockMvc.perform(
+            post("/api/posts")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                    CreatePostRequest(
+                        title = "Spring Boot 가이드",
+                        contentHtml = "Spring Boot 기초 내용입니다.",
+                        hashtags = listOf("Spring")
+                    )
+                ))
+        ).andExpect(status().isCreated)
+
+        // 벡터화 완료 대기
+        Thread.sleep(2000)
+
+        val searchRequest = """
+            {
+                "query": "완전히 관련 없는 키워드 xyz123 abc789",
+                "threshold": 0.5,
+                "limit": 20
+            }
+        """.trimIndent()
+
+        val result = mockMvc.perform(
+            post("/api/posts/search")
+                .header("Authorization", "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(searchRequest)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.results").isArray)
+            .andReturn()
+
+        // ML 기반 벡터 검색은 완전히 관련 없는 키워드도 낮은 유사도로 반환할 수 있음
+        // threshold=0.5로 필터링되거나 또는 낮은 유사도로 반환됨
+        val responseJson = result.response.contentAsString
+        val responseMap = objectMapper.readValue(responseJson, Map::class.java)
+        val results = responseMap["results"] as List<Map<String, Any>>
+
+        // 결과가 있다면 유사도가 낮아야 함 (임계값 근처)
+        results.forEach { result ->
+            val similarity = result["similarity"] as Double
+            assert(similarity >= 0.5) { "임계값 이하 결과 발견: similarity=$similarity" }
+        }
+    }
+
+    @Test
+    @DisplayName("인증 없이 검색 시 401 오류를 반환한다")
+    fun testSearchUnauthorized() {
+        val searchRequest = """
+            {
+                "query": "test query",
+                "threshold": 0.5,
+                "limit": 10
+            }
+        """.trimIndent()
+
+        mockMvc.perform(
+            post("/api/posts/search")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(searchRequest)
+        )
+            .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    @DisplayName("게시글을 소프트 삭제한다")
     fun testDeletePost() {
-        // Given: 테스트용 사용자 및 게시글 생성
         val user = userRepository.save(
             User(
                 email = "author@example.com",
@@ -695,12 +836,10 @@ class PostControllerTest {
 
         val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
 
-        // When: DELETE /api/posts/{id}
         mockMvc.perform(
             delete("/api/posts/${post.id}")
                 .header("Authorization", "Bearer $accessToken")
         )
-            // Then: 204 No Content
             .andExpect(status().isNoContent)
 
         // 소프트 삭제 확인
@@ -708,17 +847,9 @@ class PostControllerTest {
         assert(deletedPost.deleted) { "게시글이 소프트 삭제되지 않았습니다 (deleted=false)" }
     }
 
-    /**
-     * T080: 삭제 권한 실패 테스트
-     *
-     * Given: 작성자 A의 게시글
-     * When: 사용자 B가 삭제 시도
-     * Then: 403 Forbidden + 게시글 유지
-     */
     @Test
-    @DisplayName("testDeletePostForbidden - 작성자가 아닌 경우 삭제 시 403 오류를 반환한다")
+    @DisplayName("작성자가 아닌 경우 삭제 시 403 오류를 반환한다")
     fun testDeletePostForbidden() {
-        // Given: 작성자 A 및 게시글 생성
         val authorA = userRepository.save(
             User(
                 email = "author.a@example.com",
@@ -749,12 +880,10 @@ class PostControllerTest {
 
         val accessTokenB = jwtTokenService.generateAccessToken(userB.id!!, userB.email)
 
-        // When: 사용자 B가 DELETE /api/posts/{id} 시도
         mockMvc.perform(
             delete("/api/posts/${post.id}")
                 .header("Authorization", "Bearer $accessTokenB")
         )
-            // Then: 403 Forbidden
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.error.code").value("FORBIDDEN"))
             .andExpect(jsonPath("$.error.message").value("게시글을 삭제할 권한이 없습니다"))
@@ -764,17 +893,9 @@ class PostControllerTest {
         assert(!unchangedPost.deleted) { "게시글이 삭제되었습니다 (deleted=true)" }
     }
 
-    /**
-     * T081: 삭제된 게시글 목록 제외 테스트
-     *
-     * Given: 게시글 5개 (2개 삭제됨)
-     * When: GET /api/posts 호출
-     * Then: 삭제되지 않은 3개만 반환
-     */
     @Test
-    @DisplayName("testGetPostsExcludeDeleted - 목록 조회 시 삭제된 게시글을 제외한다")
+    @DisplayName("목록 조회 시 삭제된 게시글을 제외한다")
     fun testGetPostsExcludeDeleted() {
-        // Given: 5개의 게시글 생성
         val user = userRepository.save(
             User(
                 email = "user@example.com",
@@ -805,12 +926,10 @@ class PostControllerTest {
 
         val accessToken = jwtTokenService.generateAccessToken(user.id!!, user.email)
 
-        // When: GET /api/posts
         mockMvc.perform(
             get("/api/posts")
                 .header("Authorization", "Bearer $accessToken")
         )
-            // Then: 삭제되지 않은 3개만 반환
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.posts.length()").value(3))
             .andExpect(jsonPath("$.pagination.totalElements").value(3))

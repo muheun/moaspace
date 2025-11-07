@@ -6,6 +6,8 @@ import type {
   VectorSearchRequest,
   VectorSearchResponse,
   PostListResponse,
+  PostSearchRequest,
+  PostSearchResponse,
 } from '@/types/api/post';
 
 export const postsApi = {
@@ -47,9 +49,15 @@ export const postsApi = {
     await apiClient.delete(`/api/posts/${id}`);
   },
 
-  // 벡터 유사도 검색
+  // 벡터 유사도 검색 (레거시)
   async searchPosts(request: VectorSearchRequest): Promise<VectorSearchResponse> {
     const response = await apiClient.post<VectorSearchResponse>('/api/posts/search', request);
+    return response.data;
+  },
+
+  // 필드별 가중치 검색 (Phase 6)
+  async searchPostsByFields(request: PostSearchRequest): Promise<PostSearchResponse> {
+    const response = await apiClient.post<PostSearchResponse>('/api/posts/search', request);
     return response.data;
   },
 };

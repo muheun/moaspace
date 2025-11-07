@@ -12,19 +12,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 
-/**
- * UniversalVectorIndexingService 통합 테스트
- *
- * 테스트 범위:
- * - indexEntity: 엔티티 인덱싱 (이벤트 발행 + 비동기 처리)
- * - reindexEntity: 재인덱싱 (기존 청크 삭제 + 새 청크 생성)
- * - deleteEntity: 청크 삭제
- * - search: 벡터 검색
- *
- * 주의: @Transactional 제거
- * - 비동기 처리와 @Transactional이 충돌하여 테스트가 실패할 수 있음
- * - 각 테스트 후 수동으로 데이터 정리
- */
 @SpringBootTest
 @ActiveProfiles("test")
 @DisplayName("UniversalVectorIndexingService 테스트")
@@ -43,7 +30,7 @@ class UniversalVectorIndexingServiceTest {
     }
 
     @Test
-    @DisplayName("indexEntity - 이벤트를 발행하고 즉시 CompletableFuture를 반환한다")
+    @DisplayName("이벤트를 발행하고 즉시 CompletableFuture를 반환한다")
     fun shouldPublishEventAndReturnImmediateFutureWhenIndexingEntity() {
         // Given
         val request = VectorIndexRequest(
@@ -78,9 +65,8 @@ class UniversalVectorIndexingServiceTest {
     }
 
     @Test
-    @DisplayName("reindexEntity - 기존 청크를 삭제하고 새 청크를 생성한다")
+    @DisplayName("기존 청크를 삭제하고 새 청크를 생성한다")
     fun shouldDeleteOldChunksAndCreateNewChunksWhenReindexing() {
-        // Given: 먼저 청크 생성
         val initialRequest = VectorIndexRequest(
             namespace = "vector_ai",
             entity = "posts",
@@ -98,7 +84,6 @@ class UniversalVectorIndexingServiceTest {
         )
         assertThat(oldChunks).isNotEmpty
 
-        // When: 재인덱싱
         val reindexRequest = VectorIndexRequest(
             namespace = "vector_ai",
             entity = "posts",
@@ -125,9 +110,8 @@ class UniversalVectorIndexingServiceTest {
     }
 
     @Test
-    @DisplayName("deleteEntity - 지정된 엔티티의 모든 청크를 삭제한다")
+    @DisplayName("지정된 엔티티의 모든 청크를 삭제한다")
     fun shouldDeleteAllChunksOfSpecifiedEntity() {
-        // Given: 청크 생성
         val request = VectorIndexRequest(
             namespace = "vector_ai",
             entity = "comments",
@@ -145,10 +129,8 @@ class UniversalVectorIndexingServiceTest {
         )
         assertThat(chunksBeforeDelete).isNotEmpty
 
-        // When: 삭제
         service.deleteEntity("vector_ai", "comments", "comment-789")
 
-        // Then: 청크가 모두 삭제되었는지 검증
         val chunksAfterDelete = vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc(
             "vector_ai",
             "comments",
@@ -158,9 +140,8 @@ class UniversalVectorIndexingServiceTest {
     }
 
     @Test
-    @DisplayName("search - 검색어와 유사한 청크를 찾아 반환한다")
+    @DisplayName("검색어와 유사한 청크를 찾아 반환한다")
     fun shouldFindAndReturnSimilarChunksForQuery() {
-        // Given: 테스트 데이터 생성
         val product1 = VectorIndexRequest(
             namespace = "test_db",
             entity = "products",
@@ -180,7 +161,6 @@ class UniversalVectorIndexingServiceTest {
         service.indexEntity(product2)
         Thread.sleep(1500) // 비동기 처리 대기
 
-        // When: 검색
         val searchRequest = VectorSearchRequest(
             query = "스마트폰 추천",
             namespace = "test_db",
@@ -198,7 +178,7 @@ class UniversalVectorIndexingServiceTest {
     }
 
     @Test
-    @DisplayName("indexEntity - 여러 필드를 가진 엔티티도 정상 인덱싱된다")
+    @DisplayName("여러 필드를 가진 엔티티도 정상 인덱싱된다")
     fun shouldIndexEntityWithMultipleFieldsSuccessfully() {
         // Given
         val request = VectorIndexRequest(
@@ -221,7 +201,6 @@ class UniversalVectorIndexingServiceTest {
         service.indexEntity(request)
         Thread.sleep(1000) // 비동기 처리 대기
 
-        // Then: 각 필드별로 청크가 생성되었는지 검증
         val chunks = vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc(
             "cms",
             "articles",
@@ -235,9 +214,8 @@ class UniversalVectorIndexingServiceTest {
     }
 
     @Test
-    @DisplayName("deleteEntity - 다양한 namespace와 entity 조합으로 삭제 가능하다")
+    @DisplayName("다양한 namespace와 entity 조합으로 삭제 가능하다")
     fun shouldDeleteEntitiesFromVariousNamespaceAndEntityCombinations() {
-        // Given: 여러 엔티티 생성
         service.indexEntity(VectorIndexRequest("db1", "posts", "1", mapOf("text" to "내용1"), null))
         service.indexEntity(VectorIndexRequest("db2", "products", "2", mapOf("text" to "내용2"), null))
         service.indexEntity(VectorIndexRequest("cms", "articles", "article-123", mapOf("text" to "내용3"), null))
@@ -261,7 +239,6 @@ class UniversalVectorIndexingServiceTest {
     @Test
     @DisplayName("[US1] Scenario 1 - Product 테이블 10개 레코드, 스마트폰 검색 시 유사도 순 반환")
     fun shouldReturnProductsSortedBySimilarityWhenSearchingForSmartphone() {
-        // Given: 10개의 Product 레코드 생성
         val products = listOf(
             "갤럭시 스마트폰 최신 모델입니다",
             "아이폰 스마트폰 프리미엄 제품입니다",
@@ -291,7 +268,6 @@ class UniversalVectorIndexingServiceTest {
         }
         Thread.sleep(3000) // 비동기 처리 대기 (10개 제품)
 
-        // When: "스마트폰" 검색
         val searchRequest = VectorSearchRequest(
             query = "스마트폰",
             namespace = "shop_db",
@@ -301,7 +277,6 @@ class UniversalVectorIndexingServiceTest {
         )
         val results = service.search(searchRequest)
 
-        // Then: 결과가 유사도 순으로 정렬되어 반환됨
         assertThat(results).isNotEmpty
         assertThat(results.size).isLessThanOrEqualTo(10)
 
@@ -318,7 +293,6 @@ class UniversalVectorIndexingServiceTest {
     @Test
     @DisplayName("[US1] Scenario 2 - posts와 products 모두 인덱싱, posts만 검색 시 products 제외")
     fun shouldReturnOnlyPostsWhenSearchingInPostsEntity() {
-        // Given: posts와 products 모두 인덱싱
         // Posts 데이터
         service.indexEntity(
             VectorIndexRequest(
@@ -361,7 +335,6 @@ class UniversalVectorIndexingServiceTest {
 
         Thread.sleep(2000) // 비동기 처리 대기
 
-        // When: posts 엔티티만 검색
         val searchRequest = VectorSearchRequest(
             query = "Spring Boot",
             namespace = "vector_ai",
@@ -371,7 +344,6 @@ class UniversalVectorIndexingServiceTest {
         )
         val results = service.search(searchRequest)
 
-        // Then: posts 결과만 반환되고 products는 제외됨
         assertThat(results).isNotEmpty
         assertThat(results.all { it.entity == "posts" }).isTrue()
         assertThat(results.none { it.entity == "products" }).isTrue()
@@ -381,7 +353,6 @@ class UniversalVectorIndexingServiceTest {
     @Test
     @DisplayName("[US1] Scenario 3 - comments 테이블 추가 시 코드 변경 없이 즉시 인덱싱 및 검색")
     fun shouldIndexAndSearchCommentsWithoutCodeChanges() {
-        // Given: 새로운 comments 엔티티 추가 (코드 변경 없이)
         service.indexEntity(
             VectorIndexRequest(
                 namespace = "forum_db",
@@ -412,7 +383,6 @@ class UniversalVectorIndexingServiceTest {
 
         Thread.sleep(2000) // 비동기 처리 대기
 
-        // When: comments 검색
         val searchRequest = VectorSearchRequest(
             query = "유익한 정보",
             namespace = "forum_db",
@@ -422,7 +392,6 @@ class UniversalVectorIndexingServiceTest {
         )
         val results = service.search(searchRequest)
 
-        // Then: comments가 정상적으로 인덱싱되고 검색됨
         assertThat(results).isNotEmpty
         assertThat(results.all { it.entity == "comments" }).isTrue()
         assertThat(results.all { it.namespace == "forum_db" }).isTrue()
@@ -443,7 +412,6 @@ class UniversalVectorIndexingServiceTest {
     @Test
     @DisplayName("US2-AC1 - 특정 필드만 검색하면 해당 필드가 매칭 필드로 표시됨")
     fun shouldMatchSpecificFieldWhenSearchingOnlyThatField() {
-        // Given: "제목: PostgreSQL 가이드, 본문: MySQL 설명..." 게시글
         service.indexEntity(
             VectorIndexRequest(
                 namespace = "vector_ai",
@@ -470,7 +438,6 @@ class UniversalVectorIndexingServiceTest {
         )
         Thread.sleep(2000) // 비동기 처리 대기
 
-        // When: "PostgreSQL"로 title 필드만 검색
         val searchRequest = VectorSearchRequest(
             query = "PostgreSQL",
             namespace = "vector_ai",
@@ -480,7 +447,6 @@ class UniversalVectorIndexingServiceTest {
         )
         val results = service.search(searchRequest)
 
-        // Then: PostgreSQL 게시글이 상위에 나타나고 매칭 필드가 "title"로 표시됨
         assertThat(results).isNotEmpty
         val topResult = results.first()
         assertThat(topResult.recordKey).isEqualTo("post-pg")
@@ -492,7 +458,6 @@ class UniversalVectorIndexingServiceTest {
     @Test
     @DisplayName("US2-AC2 - 필드별 가중치 적용 시 가중치가 높은 필드 매칭이 더 높은 점수를 받음")
     fun shouldApplyFieldWeightsCorrectlyWhenSearching() {
-        // Given: title과 content가 모두 벡터화된 게시글
         service.indexEntity(
             VectorIndexRequest(
                 namespace = "vector_ai",
@@ -519,7 +484,6 @@ class UniversalVectorIndexingServiceTest {
         )
         Thread.sleep(2000) // 비동기 처리 대기
 
-        // When: title 60%, content 40% 가중치로 "Spring Boot" 검색
         val searchRequest = VectorSearchRequest(
             query = "Spring Boot",
             namespace = "vector_ai",
@@ -532,7 +496,6 @@ class UniversalVectorIndexingServiceTest {
         )
         val results = service.search(searchRequest)
 
-        // Then: 필드별 가중치가 적용되어 검색됨 (목업 벡터이므로 점수 자체보다는 검색 가능 여부 확인)
         assertThat(results).isNotEmpty
         assertThat(results).hasSizeGreaterThanOrEqualTo(2)
 
@@ -552,7 +515,6 @@ class UniversalVectorIndexingServiceTest {
     @Test
     @DisplayName("US2-AC3 - 특정 필드만 업데이트하면 해당 필드 벡터만 재생성됨")
     fun shouldRegenerateOnlyUpdatedFieldVectors() {
-        // Given: Product의 name과 description 필드가 모두 벡터화됨
         service.indexEntity(
             VectorIndexRequest(
                 namespace = "shop_db",
@@ -578,7 +540,6 @@ class UniversalVectorIndexingServiceTest {
 
         println("초기 청크 - name: ${initialNameChunks.size}, description: ${initialDescChunks.size}")
 
-        // When: name 필드만 업데이트 (description은 유지)
         // 실제로는 특정 필드만 재인덱싱하는 API가 필요하지만, 여기서는 전체 재인덱싱으로 시뮬레이션
         service.reindexEntity(
             VectorIndexRequest(
@@ -594,7 +555,6 @@ class UniversalVectorIndexingServiceTest {
         )
         Thread.sleep(2000) // 비동기 처리 대기
 
-        // Then: 재인덱싱 후 모든 필드가 재생성됨 (현재 구현)
         val updatedChunks = vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc(
             "shop_db",
             "products",

@@ -1,6 +1,6 @@
 package me.muheun.moaspace.dto
 
-import me.muheun.moaspace.domain.Post
+import me.muheun.moaspace.domain.post.Post
 import java.time.LocalDateTime
 
 /**

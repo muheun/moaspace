@@ -34,6 +34,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter-cache")
+
+    // Caffeine Cache
+    implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
 
     // Spring Security + OAuth2 (User Story 1)
     implementation("org.springframework.boot:spring-boot-starter-security")
@@ -126,9 +130,25 @@ tasks.withType<Test> {
     // 테스트 순차 실행 (병렬 실행으로 인한 DB 동시성 문제 방지)
     maxParallelForks = 1
 
-    // MPNet 모델(1.0GB) 로딩을 위한 메모리 증가
-    minHeapSize = "1024m"
-    maxHeapSize = "2048m"
+    // ONNX 모델 및 대용량 텍스트 처리를 위한 메모리 최적화
+    minHeapSize = "2048m"  // 2GB
+    maxHeapSize = "4096m"  // 4GB (OutOfMemoryError 해결)
+
+    // JVM 인자 설정
+    jvmArgs = listOf(
+        // G1GC 설정 (대용량 Heap 최적화, Stop-the-World 시간 최소화)
+        "-XX:+UseG1GC",
+        "-XX:MaxGCPauseMillis=200",  // GC 일시 중지 최대 200ms
+
+        // Young Generation 최적화 (단명 객체가 많으므로)
+        "-XX:NewRatio=1",  // Young:Old = 1:1 (기본 2에서 변경)
+
+        // GC 로깅 (디버깅 및 프로파일링용)
+        "-Xlog:gc*:file=build/gc.log:time,level,tags",
+
+        // ONNX Runtime Direct Memory 증가 (모델 파일 1.1GB 로딩 필요)
+        "-XX:MaxDirectMemorySize=2048m"
+    )
 
     // 테스트 결과 로깅
     testLogging {

@@ -13,7 +13,7 @@
     </select>
 
     <!-- 해시태그로 게시글 검색 -->
-    <select id="findByHashtag" resultType="me.muheun.moaspace.domain.Post">
+    <select id="findByHashtag" resultType="me.muheun.moaspace.domain.post.Post">
         SELECT p.*
         FROM posts p
         WHERE #{hashtag} = ANY(p.hashtags)

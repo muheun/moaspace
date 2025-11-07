@@ -9,16 +9,6 @@ import java.nio.charset.StandardCharsets
 import java.util.*
 import javax.crypto.SecretKey
 
-/**
- * JWT 토큰 생성 및 검증 서비스
- * T019: JWT 토큰 생성 서비스 구현
- *
- * 주요 기능:
- * - 액세스 토큰 생성 (1시간 유효)
- * - 리프레시 토큰 생성 (7일 유효)
- * - 토큰 검증 및 파싱
- * - 사용자 ID 추출
- */
 @Service
 class JwtTokenService(
     @Value("\${jwt.secret}") private val jwtSecret: String,

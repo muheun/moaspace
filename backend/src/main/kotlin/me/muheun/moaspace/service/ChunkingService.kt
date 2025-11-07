@@ -2,91 +2,52 @@ package me.muheun.moaspace.service
 
 import org.springframework.stereotype.Service
 
-// 토큰 기반 텍스트 청킹
+/**
+ * Sliding Window 방식 텍스트 청킹 서비스
+ *
+ * 고정 길이 청크(기본 500자)와 오버랩(기본 50자)을 사용하여
+ * 텍스트를 분할합니다.
+ */
 @Service
-class ChunkingService(
-    private val tokenizerService: TokenizerService
-) {
+class ChunkingService {
 
     companion object {
-        private const val MAX_TOKENS_PER_CHUNK = 512
-        private const val TARGET_TOKENS_PER_CHUNK = 256
+        const val DEFAULT_CHUNK_SIZE = 500
+        const val DEFAULT_OVERLAP = 50
     }
 
     /**
-     * 텍스트를 토큰 기반으로 청킹
-     *
-     * 문장 단위로 분할하고 TARGET_TOKENS_PER_CHUNK를 기준으로 그룹화합니다.
+     * Sliding Window 방식으로 텍스트 청킹
      *
      * @param text 분할할 원본 텍스트
+     * @param chunkSize 청크 크기 (기본 500자)
+     * @param overlap 오버랩 크기 (기본 50자)
      * @return 청크 리스트 (빈 텍스트일 경우 빈 리스트)
      */
-    fun chunkText(text: String): List<String> {
+    fun chunkText(
+        text: String,
+        chunkSize: Int = DEFAULT_CHUNK_SIZE,
+        overlap: Int = DEFAULT_OVERLAP
+    ): List<String> {
         if (text.isBlank()) return emptyList()
 
-        val totalTokens = tokenizerService.countTokens(text)
+        val trimmedText = text.trim()
 
-        if (totalTokens <= TARGET_TOKENS_PER_CHUNK) {
-            return listOf(text.trim())
+        if (trimmedText.length <= chunkSize) {
+            return listOf(trimmedText)
         }
 
-        val sentences = splitIntoSentences(text)
         val chunks = mutableListOf<String>()
-        val currentChunk = StringBuilder()
-        var currentTokenCount = 0
+        var startIndex = 0
 
-        for (sentence in sentences) {
-            val sentenceTokens = tokenizerService.countTokens(sentence)
+        while (startIndex < trimmedText.length) {
+            val endIndex = minOf(startIndex + chunkSize, trimmedText.length)
+            chunks.add(trimmedText.substring(startIndex, endIndex))
 
-            if (sentenceTokens > MAX_TOKENS_PER_CHUNK) {
-                if (currentChunk.isNotEmpty()) {
-                    chunks.add(currentChunk.toString().trim())
-                    currentChunk.clear()
-                    currentTokenCount = 0
-                }
-
-                val truncated = tokenizerService.truncateToTokenLimit(sentence, MAX_TOKENS_PER_CHUNK)
-                chunks.add(truncated)
-                continue
-            }
-
-            if (currentTokenCount + sentenceTokens > TARGET_TOKENS_PER_CHUNK && currentChunk.isNotEmpty()) {
-                chunks.add(currentChunk.toString().trim())
-                currentChunk.clear()
-                currentTokenCount = 0
-            }
-
-            currentChunk.append(sentence).append(" ")
-            currentTokenCount += sentenceTokens
-        }
-
-        if (currentChunk.isNotEmpty()) {
-            chunks.add(currentChunk.toString().trim())
+            val step = chunkSize - overlap
+            startIndex += step
         }
 
         return chunks
-    }
-
-    /**
-     * 텍스트를 문장 단위로 분할
-     */
-    private fun splitIntoSentences(text: String): List<String> {
-        val sentencePattern = Regex("""[^.!?]*[.!?]+""")
-        val matches = sentencePattern.findAll(text)
-        val sentences = matches.map { it.value.trim() }.filter { it.isNotBlank() }.toList()
-
-        if (sentences.isEmpty()) {
-            return listOf(text.trim())
-        }
-
-        val lastMatchEnd = matches.lastOrNull()?.range?.last ?: -1
-        if (lastMatchEnd < text.length - 1) {
-            val remaining = text.substring(lastMatchEnd + 1).trim()
-            if (remaining.isNotBlank()) {
-                return sentences + remaining
-            }
-        }
-
-        return sentences
     }
 }

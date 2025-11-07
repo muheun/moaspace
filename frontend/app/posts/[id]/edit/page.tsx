@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState, useEffect, useRef, startTransition } from 'react';
+import { use, useState, useEffect, startTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
@@ -13,14 +13,14 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { marked } from 'marked';
 
 /**
- * T094: Lexical 에디터 지연 로딩 최적화
+ * T094: Tiptap 에디터 지연 로딩 최적화
  * next/dynamic을 사용하여 에디터를 사용할 때만 로드
  */
-const LexicalEditor = dynamic(
-  () => import('@/components/editor/LexicalEditor').then(mod => ({ default: mod.LexicalEditor })),
+const RichTextEditor = dynamic(
+  () => import('@/components/RichTextEditor'),
   {
     loading: () => <Skeleton className="h-64 w-full" />,
-    ssr: false, // 클라이언트 전용 컴포넌트
+    ssr: false,
   }
 );
 
@@ -48,7 +48,6 @@ export default function EditPostPage({
   const [title, setTitle] = useState('');
   const [contentHtml, setContentHtml] = useState('');
   const [hashtags, setHashtags] = useState('');
-  const isInitialized = useRef(false);
 
   /**
    * 게시글 데이터 로드 후 폼 초기화
@@ -59,7 +58,7 @@ export default function EditPostPage({
    * - contentText는 Backend 응답에 포함되지 않음 (벡터화 전용, DB 내부용)
    */
   useEffect(() => {
-    if (post && !isInitialized.current) {
+    if (post) {
       startTransition(() => {
         setTitle(post.title);
         setHashtags(post.hashtags.join(', '));
@@ -76,22 +75,16 @@ export default function EditPostPage({
           setContentHtml('<p></p>');
         }
       });
-
-      isInitialized.current = true;
     }
   }, [post]);
 
   /**
-   * Lexical 에디터 내용 변경 시 호출
+   * Tiptap 에디터 내용 변경 시 호출
    *
    * @param html - HTML 포맷 (contentHtml 필드에 저장)
-   * @param _text - Plain Text (Backend가 자동 추출하므로 Frontend에서는 미사용)
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleEditorChange = (html: string, _text: string) => {
+  const handleEditorChange = (html: string) => {
     setContentHtml(html);
-    // _text 파라미터는 LexicalEditor의 onChange 시그니처와 일치시키기 위해 받지만,
-    // Constitution Principle VIII에 따라 Backend가 contentHtml → contentText 자동 변환
   };
 
   /**
@@ -154,7 +147,7 @@ export default function EditPostPage({
    */
   if (isPostLoading || isAuthLoading) {
     return (
-      <main className="container mx-auto px-4 py-8 max-w-4xl" role="status" aria-label="페이지 로딩 중">
+      <main className="container mx-auto px-4 py-8" role="status" aria-label="페이지 로딩 중">
         <Skeleton className="h-8 w-1/4 mb-8" />
         <div className="space-y-6">
           <div>
@@ -179,7 +172,7 @@ export default function EditPostPage({
    */
   if (!post) {
     return (
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <main className="container mx-auto px-4 py-8">
         <section className="text-center py-16">
           <h1 className="text-2xl font-bold text-red-600 mb-4">
             게시글을 찾을 수 없습니다
@@ -198,7 +191,7 @@ export default function EditPostPage({
    */
   if (user && user.id !== post.author.id) {
     return (
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <main className="container mx-auto px-4 py-8">
         <section className="text-center py-16">
           <h1 className="text-2xl font-bold text-red-600 mb-4">
             수정 권한이 없습니다
@@ -219,7 +212,7 @@ export default function EditPostPage({
    */
   if (!user) {
     return (
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <main className="container mx-auto px-4 py-8">
         <section className="text-center py-16">
           <h1 className="text-2xl font-bold mb-4">로그인이 필요합니다</h1>
           <p className="text-gray-600 mb-6">
@@ -233,7 +226,7 @@ export default function EditPostPage({
 
   return (
     <ErrorBoundary>
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <main className="container mx-auto px-4 py-8 max-w-6xl">
         <h1 className="text-3xl font-bold mb-8">게시글 수정</h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -262,11 +255,10 @@ export default function EditPostPage({
           <label className="block text-sm font-medium mb-2" aria-label="게시글 내용">
             내용 <span className="text-red-500">*</span>
           </label>
-          <LexicalEditor
-            initialContent={contentHtml}
+          <RichTextEditor
+            content={contentHtml}
             onChange={handleEditorChange}
             placeholder="게시글 내용을 작성하세요. 마크다운 문법을 지원합니다."
-            disabled={isPending}
           />
         </div>
 

@@ -1,6 +1,6 @@
 package me.muheun.moaspace.repository
 
-import me.muheun.moaspace.domain.Post
+import me.muheun.moaspace.domain.post.Post
 import me.muheun.moaspace.query.dto.PostSearchFilter
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable

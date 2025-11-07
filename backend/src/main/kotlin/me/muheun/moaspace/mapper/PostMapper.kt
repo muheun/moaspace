@@ -1,6 +1,6 @@
 package me.muheun.moaspace.mapper
 
-import me.muheun.moaspace.domain.Post
+import me.muheun.moaspace.domain.post.Post
 import org.apache.ibatis.annotations.Mapper
 import org.apache.ibatis.annotations.Param
 

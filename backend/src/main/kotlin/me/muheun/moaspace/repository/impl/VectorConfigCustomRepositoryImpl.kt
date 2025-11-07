@@ -1,31 +1,13 @@
 package me.muheun.moaspace.repository.impl
 
 import com.querydsl.jpa.impl.JPAQueryFactory
-import me.muheun.moaspace.domain.QVectorConfig
-import me.muheun.moaspace.domain.VectorConfig
+import me.muheun.moaspace.domain.vector.QVectorConfig
+import me.muheun.moaspace.domain.vector.VectorConfig
 import me.muheun.moaspace.query.whereAnd
 import me.muheun.moaspace.repository.VectorConfigCustomRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Repository
 
-/**
- * VectorConfig QueryDSL 기반 Custom Repository 구현체
- *
- * Constitution Principle VI 준수:
- * - QueryDSL 우선 사용 (타입 안전 쿼리)
- * - whereAnd() 패턴으로 동적 조건 처리
- *
- * Q클래스 기반 구현:
- * - QVectorConfig는 kapt에 의해 자동 생성됨 (build/generated/source/kapt)
- * - 컴파일 타입 검증, IDE 자동완성 지원
- *
- * CustomRepository 3-tier 패턴:
- * 1. VectorConfigCustomRepository (인터페이스) - 계약 정의
- * 2. VectorConfigCustomRepositoryImpl (구현체) - 실제 QueryDSL 쿼리
- * 3. VectorConfigRepository - JpaRepository + Custom 통합
- *
- * @Repository 어노테이션 필수: QueryDSL 구현체는 수동 등록 필요
- */
 @Repository
 class VectorConfigCustomRepositoryImpl(
     private val queryFactory: JPAQueryFactory

@@ -20,14 +20,6 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.transaction.annotation.Transactional
 import jakarta.persistence.EntityManager
 
-/**
- * VectorConfigController REST API 통합 테스트
- *
- * Constitution Principle V 준수: Real Database Integration
- * - @SpringBootTest + MockMvc로 전체 HTTP 요청/응답 검증
- * - 실제 DB 사용 (Mock 금지)
- * - @Transactional로 각 테스트 격리 및 롤백
- */
 @SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc(addFilters = false)

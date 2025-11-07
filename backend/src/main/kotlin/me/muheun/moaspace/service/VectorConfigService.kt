@@ -1,6 +1,6 @@
 package me.muheun.moaspace.service
 
-import me.muheun.moaspace.domain.VectorConfig
+import me.muheun.moaspace.domain.vector.VectorConfig
 import me.muheun.moaspace.dto.VectorConfigCreateRequest
 import me.muheun.moaspace.dto.VectorConfigResponse
 import me.muheun.moaspace.dto.VectorConfigUpdateRequest
@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional
  * VectorConfig 비즈니스 로직 서비스
  *
  * 벡터 설정의 CRUD 작업 및 캐싱을 담당합니다.
- * 캐시는 5초 TTL로 설정되며, 설정 변경 시 자동으로 무효화됩니다.
+ * 캐시는 Caffeine (5분 TTL, 최대 1000개)로 설정되며, 설정 변경 시 자동으로 무효화됩니다.
  */
 @Service
 @Transactional(readOnly = true)
@@ -105,6 +105,18 @@ class VectorConfigService(
     fun findByEntityTypeAndFieldName(entityType: String, fieldName: String): VectorConfigResponse? {
         return vectorConfigRepository.findByEntityTypeAndFieldName(entityType, fieldName)
             ?.let { VectorConfigResponse.from(it) }
+    }
+
+    /**
+     * 엔티티 타입의 활성화된 벡터화 설정 조회 (캐시 적용)
+     * VectorIndexingService에서 사용하는 핵심 메서드
+     *
+     * @param entityType 엔티티 타입 (예: Post)
+     * @return 활성화된 필드별 설정 리스트 (VectorConfig 엔티티)
+     */
+    @Cacheable(cacheNames = ["vectorConfig"], key = "#entityType + ':enabled'")
+    fun findEnabledConfigsByEntityType(entityType: String): List<VectorConfig> {
+        return vectorConfigRepository.findByEntityTypeAndEnabled(entityType, true)
     }
 
     /**

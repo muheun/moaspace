@@ -13,6 +13,7 @@ import type {
   CreatePostRequest,
   UpdatePostRequest,
   VectorSearchRequest,
+  PostSearchRequest,
 } from '@/types/api/post';
 
 /**
@@ -26,6 +27,8 @@ export const postKeys = {
   details: () => [...postKeys.all, 'detail'] as const,
   detail: (id: number) => [...postKeys.details(), id] as const,
   search: (query: string) => [...postKeys.all, 'search', query] as const,
+  fieldSearch: (query: string, fields?: string[]) =>
+    [...postKeys.all, 'field-search', query, fields?.sort().join(',') || 'all'] as const,
 };
 
 /**
@@ -130,7 +133,7 @@ export function useDeletePost() {
 }
 
 /**
- * 벡터 검색 query
+ * 벡터 검색 query (레거시)
  *
  * @param request 검색 요청 (query, threshold, limit)
  * @param enabled 쿼리 활성화 여부 (기본값: false, 수동 실행)
@@ -146,6 +149,30 @@ export function useSearchPosts(
   return useQuery({
     queryKey: postKeys.search(request.query),
     queryFn: () => postsApi.searchPosts(request),
+    enabled,
+  });
+}
+
+/**
+ * 필드별 가중치 검색 query (Phase 6)
+ *
+ * @param request 검색 요청 (query, fields, limit)
+ * @param enabled 쿼리 활성화 여부 (기본값: false, 수동 실행)
+ *
+ * @example
+ * const { data, refetch, isLoading } = usePostSearch(
+ *   { query: "Kotlin", fields: ["title", "content"], limit: 10 },
+ *   false
+ * );
+ * // 검색 버튼 클릭 시 refetch() 호출
+ */
+export function usePostSearch(
+  request: PostSearchRequest,
+  enabled: boolean = false
+) {
+  return useQuery({
+    queryKey: postKeys.fieldSearch(request.query, request.fields),
+    queryFn: () => postsApi.searchPostsByFields(request),
     enabled,
   });
 }

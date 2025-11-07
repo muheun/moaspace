@@ -3,12 +3,6 @@ package me.muheun.moaspace.dto
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 
-/**
- * 게시글 벡터 검색 요청 DTO
- * T063: POST /api/posts/search 엔드포인트용
- *
- * Constitution Principle IX: frontend/types/api/post.ts의 VectorSearchRequest와 수동 동기화 필요
- */
 data class PostSearchRequest(
     val query: String, // 검색 쿼리 (1자 이상)
 

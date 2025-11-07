@@ -12,20 +12,6 @@ import org.springframework.security.web.SecurityFilterChain
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
 
-/**
- * 테스트 환경용 Security 설정
- *
- * @Profile("test")로 테스트 환경에서만 활성화됩니다.
- * 실제 SecurityConfig의 JWT 검증 로직을 동일하게 사용하되,
- * OAuth2와 CORS 설정은 제외하여 간소화했습니다.
- *
- * 주요 기능:
- * - JWT 토큰 검증 (JwtDecoder)
- * - Stateless 세션 관리
- * - 인증이 필요한 엔드포인트 보호
- *
- * Constitution Principle V: 실제 Security 로직을 테스트에서도 동일하게 검증
- */
 @Configuration
 @Profile("test")
 @EnableWebSecurity

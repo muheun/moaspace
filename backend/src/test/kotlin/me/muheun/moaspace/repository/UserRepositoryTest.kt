@@ -11,13 +11,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 
-/**
- * UserRepository 영속성 테스트
- * Constitution Principle V: 실제 DB 연동 테스트 (@SpringBootTest + @Transactional)
- * Mock 테스트 절대 금지
- *
- * @Transactional: 각 테스트가 트랜잭션 내에서 실행되고 종료 후 롤백되어 DB 격리 보장
- */
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
@@ -37,15 +30,8 @@ class UserRepositoryTest {
         entityManager.clear()
     }
 
-    /**
-     * User 저장 테스트 (모든 필드)
-     *
-     * Given: email, name, profileImageUrl 포함 User
-     * When: persistAndFlush() 호출
-     * Then: 모든 필드 정상 저장 + ID 및 createdAt 자동 생성
-     */
     @Test
-    @DisplayName("testSaveUser - User를 모든 필드와 함께 저장한다")
+    @DisplayName("User를 모든 필드와 함께 저장한다")
     fun testSaveUser() {
         // Given
         val user = User(
@@ -66,15 +52,8 @@ class UserRepositoryTest {
         assertNotNull(savedUser.createdAt)
     }
 
-    /**
-     * 이메일로 User 조회 테스트
-     *
-     * Given: 특정 이메일의 User 저장
-     * When: findByEmail() 호출
-     * Then: 해당 User 조회 성공
-     */
     @Test
-    @DisplayName("testFindByEmail - 이메일로 User를 조회한다")
+    @DisplayName("이메일로 User를 조회한다")
     fun testFindByEmail() {
         // Given
         val user = User(
@@ -92,15 +71,8 @@ class UserRepositoryTest {
         assertEquals("검색 사용자", foundUser.get().name)
     }
 
-    /**
-     * 존재하지 않는 이메일 조회 테스트
-     *
-     * Given: 데이터 없음
-     * When: 존재하지 않는 이메일로 findByEmail() 호출
-     * Then: Optional.empty() 반환
-     */
     @Test
-    @DisplayName("testFindByEmailNotFound - 존재하지 않는 이메일 조회 시 empty를 반환한다")
+    @DisplayName("존재하지 않는 이메일 조회 시 empty를 반환한다")
     fun testFindByEmailNotFound() {
         // When
         val foundUser = userRepository.findByEmail("nonexistent@example.com")
@@ -109,15 +81,8 @@ class UserRepositoryTest {
         assertFalse(foundUser.isPresent)
     }
 
-    /**
-     * 이메일 존재 여부 확인 테스트
-     *
-     * Given: 특정 이메일의 User 저장
-     * When: existsByEmail() 호출
-     * Then: 존재하는 이메일은 true, 없는 이메일은 false 반환
-     */
     @Test
-    @DisplayName("testExistsByEmail - 이메일 존재 여부를 확인한다")
+    @DisplayName("이메일 존재 여부를 확인한다")
     fun testExistsByEmail() {
         // Given
         val user = User(
@@ -132,15 +97,8 @@ class UserRepositoryTest {
         assertFalse(userRepository.existsByEmail("notexists@example.com"))
     }
 
-    /**
-     * 이메일 UNIQUE 제약 테스트
-     *
-     * Given: 특정 이메일의 User 이미 존재
-     * When: 동일한 이메일로 새 User 저장 시도
-     * Then: Exception 발생 (UNIQUE 제약 위반)
-     */
     @Test
-    @DisplayName("testUniqueEmailConstraint - 중복된 이메일 저장 시 예외가 발생한다")
+    @DisplayName("중복된 이메일 저장 시 예외가 발생한다")
     fun testUniqueEmailConstraint() {
         // Given
         val user1 = User(
@@ -162,15 +120,8 @@ class UserRepositoryTest {
         }
     }
 
-    /**
-     * profileImageUrl null 저장 테스트
-     *
-     * Given: profileImageUrl이 null인 User
-     * When: persistAndFlush() 호출
-     * Then: 정상 저장 + profileImageUrl null 유지
-     */
     @Test
-    @DisplayName("testSaveUserWithNullProfileImage - profileImageUrl이 null인 User를 저장한다")
+    @DisplayName("profileImageUrl이 null인 User를 저장한다")
     fun testSaveUserWithNullProfileImage() {
         // Given
         val user = User(

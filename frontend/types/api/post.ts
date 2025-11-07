@@ -43,6 +43,26 @@ export interface VectorSearchResponse {
   }>;
 }
 
+// Phase 6: 필드별 가중치 검색 타입 (User Story 4)
+export type PostSearchField = 'title' | 'content' | 'hashtags' | 'author';
+
+export interface PostSearchRequest {
+  query: string;                    // 검색어, 필수
+  fields?: PostSearchField[];       // 검색 대상 필드 (미지정 시 모든 필드)
+  limit?: number;                   // 최대 결과 개수 (1~100), 기본값 10
+}
+
+export interface PostSearchResultItem {
+  post: PostDto;                    // 게시글 정보
+  totalScore: number;               // 전체 가중 합산 스코어
+  fieldScores: Record<string, number>;  // 필드별 유사도 스코어 (디버깅용)
+}
+
+export interface PostSearchResponse {
+  results: PostSearchResultItem[];  // 검색 결과 목록
+  totalResults: number;             // 총 결과 개수
+}
+
 export interface PostListResponse {
   posts: PostDto[];          // 게시글 목록
   pagination: {

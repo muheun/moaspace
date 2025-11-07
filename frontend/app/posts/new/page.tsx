@@ -11,11 +11,11 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useCreatePost } from '@/lib/hooks/usePosts';
 
 /**
- * T094: Lexical 에디터 지연 로딩 최적화
+ * T094: Tiptap 에디터 지연 로딩 최적화
  * next/dynamic을 사용하여 에디터를 사용할 때만 로드
  */
-const LexicalEditor = dynamic(
-  () => import('@/components/editor/LexicalEditor').then(mod => ({ default: mod.LexicalEditor })),
+const RichTextEditor = dynamic(
+  () => import('@/components/RichTextEditor'),
   {
     loading: () => <Skeleton className="h-64 w-full" />,
     ssr: false,
@@ -81,7 +81,7 @@ export default function NewPostPage() {
 
   return (
     <ErrorBoundary>
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <main className="container mx-auto px-4 py-8 max-w-6xl">
         <h1 className="text-3xl font-bold mb-8">새 게시글 작성</h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -110,10 +110,10 @@ export default function NewPostPage() {
             <label className="block text-sm font-medium mb-2" aria-label="게시글 내용">
               내용 <span className="text-red-500">*</span>
             </label>
-            <LexicalEditor
+            <RichTextEditor
+              content=""
               onChange={handleEditorChange}
               placeholder="게시글 내용을 작성하세요. 마크다운 문법을 지원합니다."
-              disabled={isPending}
             />
           </div>
 

@@ -3,7 +3,6 @@ package me.muheun.moaspace.controller
 import jakarta.validation.Valid
 import me.muheun.moaspace.dto.*
 import me.muheun.moaspace.service.PostService
-import me.muheun.moaspace.service.PostVectorService
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -14,45 +13,18 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.*
 import java.time.LocalDateTime
 
-/**
- * 게시글 컨트롤러
- * T043-046, T061-062: 게시글 CRUD 및 조회 엔드포인트 구현
- *
- * 주요 엔드포인트:
- * - POST /api/posts: 게시글 생성 (JWT 인증 필요)
- * - GET /api/posts: 게시글 목록 조회 (페이지네이션, 해시태그 필터)
- * - GET /api/posts/{id}: 게시글 조회 (JWT 인증 필요)
- * - PUT /api/posts/{id}: 게시글 수정 (JWT 인증 + 소유권 검증)
- *
- * Spring Security OAuth2 Resource Server 표준 방식:
- * - Filter Chain에서 JWT 자동 검증 (NimbusJwtDecoder)
- * - @AuthenticationPrincipal로 SecurityContext에서 인증 정보 주입
- * - 컨트롤러 레벨의 수동 JWT 검증 제거
- *
- * Constitution Principle IX: PostResponse는 frontend/types/api/posts.ts와 수동 동기화
- */
 @RestController
 @RequestMapping("/api/posts")
 class PostController(
     private val postService: PostService,
-    private val postVectorService: PostVectorService
+    private val vectorChunkRepository: me.muheun.moaspace.repository.VectorChunkRepository,
+    private val postRepository: me.muheun.moaspace.repository.PostRepository,
+    private val vectorEmbeddingService: me.muheun.moaspace.service.VectorEmbeddingService
 ) {
 
     private val logger = LoggerFactory.getLogger(PostController::class.java)
 
-    /**
-     * 게시글 생성
-     * T043: POST /api/posts 엔드포인트 구현
-     *
-     * Spring Security Filter Chain이 JWT 토큰을 자동으로 검증하고,
-     * @AuthenticationPrincipal을 통해 인증된 사용자 정보를 주입합니다.
-     * 생성 즉시 PostVectorService를 통해 자동 벡터화됩니다.
-     *
-     * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
-     * @param request 게시글 생성 요청 (title, content, plainContent, hashtags)
-     * @return PostResponse (생성된 게시글 정보)
-     * @throws NoSuchElementException 작성자를 찾을 수 없을 경우 (404)
-     */
+    
     @PostMapping
     fun createPost(
         @AuthenticationPrincipal jwt: Jwt,
@@ -70,19 +42,7 @@ class PostController(
         return ResponseEntity.status(HttpStatus.CREATED).body(response)
     }
 
-    /**
-     * 게시글 목록 조회 (페이지네이션 + 해시태그 필터)
-     * T061-T062: GET /api/posts 엔드포인트 구현
-     *
-     * 삭제되지 않은 게시글만 조회하며, 최신순으로 정렬됩니다.
-     * 해시태그 파라미터가 제공되면 해당 해시태그를 포함하는 게시글만 반환합니다.
-     *
-     * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
-     * @param page 페이지 번호 (0-based, 기본값: 0)
-     * @param size 페이지 크기 (기본값: 20, 최대: 100)
-     * @param hashtag 해시태그 필터 (선택적)
-     * @return PostListResponse (게시글 목록 + 페이지네이션 정보)
-     */
+    
     @GetMapping
     fun getAllPosts(
         @AuthenticationPrincipal jwt: Jwt,
@@ -103,17 +63,7 @@ class PostController(
         return ResponseEntity.ok(response)
     }
 
-    /**
-     * 게시글 조회
-     * T044: GET /api/posts/{id} 엔드포인트 구현
-     *
-     * 삭제되지 않은 게시글만 조회 가능합니다.
-     *
-     * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
-     * @param id 게시글 ID
-     * @return PostResponse (게시글 상세 정보)
-     * @throws NoSuchElementException 게시글을 찾을 수 없거나 삭제된 경우 (404)
-     */
+    
     @GetMapping("/{id}")
     fun getPostById(
         @AuthenticationPrincipal jwt: Jwt,
@@ -127,20 +77,7 @@ class PostController(
         return ResponseEntity.ok(response)
     }
 
-    /**
-     * 게시글 수정
-     * T045: PUT /api/posts/{id} 엔드포인트 구현
-     *
-     * 작성자 본인만 수정할 수 있습니다.
-     * 수정 시 PostVectorService를 통해 벡터가 자동으로 재생성됩니다.
-     *
-     * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
-     * @param id 게시글 ID
-     * @param request 게시글 수정 요청 (title, content, plainContent, hashtags)
-     * @return PostResponse (수정된 게시글 정보)
-     * @throws IllegalArgumentException 소유권이 없을 경우 (403)
-     * @throws NoSuchElementException 게시글을 찾을 수 없을 경우 (404)
-     */
+    
     @PutMapping("/{id}")
     fun updatePost(
         @AuthenticationPrincipal jwt: Jwt,
@@ -159,18 +96,7 @@ class PostController(
         return ResponseEntity.ok(response)
     }
 
-    /**
-     * 벡터 검색
-     * T063-T064: POST /api/posts/search 엔드포인트 구현
-     *
-     * 게시글의 plainContent를 벡터화하여 유사도 검색을 수행합니다.
-     * Constitution Principle III: 임계값 이상의 결과만 반환
-     *
-     * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
-     * @param request 검색 요청 (query, threshold, limit)
-     * @return VectorSearchResponse (검색 결과 + 유사도 점수)
-     * @throws IllegalArgumentException threshold 또는 limit 값이 유효하지 않을 경우 (400)
-     */
+    
     @PostMapping("/search")
     fun searchPosts(
         @AuthenticationPrincipal jwt: Jwt,
@@ -178,32 +104,38 @@ class PostController(
     ): ResponseEntity<VectorSearchResponse> {
         logger.info("벡터 검색 요청: query=${request.query.take(50)}, threshold=${request.threshold}, limit=${request.limit}")
 
-        val (postEmbeddings, similarities) = postVectorService.searchSimilarPostsWithScores(
-            queryText = request.query,
-            threshold = request.threshold,
+        // 1. 쿼리 벡터화
+        val queryVector = vectorEmbeddingService.generateEmbedding(request.query).toArray()
+
+        // 2. VectorChunk 기반 레코드별 유사도 검색
+        val recordScores = vectorChunkRepository.findSimilarRecords(
+            queryVector = queryVector,
+            namespace = "vector_ai",
+            entity = "Post",
             limit = request.limit
         )
 
-        val response = VectorSearchResponse.from(postEmbeddings, similarities)
+        // 3. threshold 필터링 및 Post 조회
+        val results = recordScores
+            .filter { it.score >= request.threshold }
+            .mapNotNull { scoreDto ->
+                val postId = scoreDto.recordKey.toLongOrNull() ?: return@mapNotNull null
+                postRepository.findById(postId).map { post ->
+                    SearchResult(
+                        post = PostSummary.from(post),
+                        similarity = scoreDto.score
+                    )
+                }.orElse(null)
+            }
+
+        val response = VectorSearchResponse(results = results)
 
         logger.info("벡터 검색 완료: 결과 수=${response.results.size}")
 
         return ResponseEntity.ok(response)
     }
 
-    /**
-     * 게시글 삭제 (Soft Delete)
-     * T076-T077: DELETE /api/posts/{id} 엔드포인트 구현
-     *
-     * 작성자 본인만 삭제할 수 있습니다.
-     * 실제로 데이터를 삭제하지 않고 deleted=true로 설정합니다.
-     *
-     * @param jwt Spring Security가 검증한 JWT 토큰 (자동 주입)
-     * @param id 게시글 ID
-     * @return 204 No Content (삭제 성공)
-     * @throws IllegalArgumentException 소유권이 없을 경우 (403)
-     * @throws NoSuchElementException 게시글을 찾을 수 없을 경우 (404)
-     */
+    
     @DeleteMapping("/{id}")
     fun deletePost(
         @AuthenticationPrincipal jwt: Jwt,

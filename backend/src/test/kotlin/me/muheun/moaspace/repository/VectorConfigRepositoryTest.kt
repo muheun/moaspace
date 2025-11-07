@@ -1,6 +1,6 @@
 package me.muheun.moaspace.repository
 
-import me.muheun.moaspace.domain.VectorConfig
+import me.muheun.moaspace.domain.vector.VectorConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -13,12 +13,6 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 import jakarta.persistence.EntityManager
 
-/**
- * VectorConfigRepository 통합 테스트
- *
- * @SpringBootTest로 실제 DB 연동 테스트 수행
- * Constitution Principle V 준수: Real Database Integration + @Transactional rollback
- */
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
@@ -38,15 +32,9 @@ class VectorConfigRepositoryTest {
         entityManager.clear()
     }
 
-    /**
-     * VectorConfig 저장 및 조회 테스트
-     *
-     * Given: VectorConfig 엔티티 생성
-     * When: save() 호출 후 findById()로 조회
-     * Then: 저장된 데이터 정상 조회 및 모든 필드값 일치
-     */
+    
     @Test
-    @DisplayName("testSaveAndFindById - VectorConfig를 저장하고 조회한다")
+    @DisplayName("VectorConfig를 저장하고 조회한다")
     fun testSaveAndFindById() {
         // given
         val config = VectorConfig(
@@ -74,15 +62,9 @@ class VectorConfigRepositoryTest {
         assertThat(found.get().entityType).isEqualTo("Post")
     }
 
-    /**
-     * findByEntityType 테스트
-     *
-     * Given: Post(2개), Comment(1개) 설정 저장
-     * When: findByEntityType("Post") 호출
-     * Then: Post 타입 설정 2개만 조회
-     */
+    
     @Test
-    @DisplayName("testFindByEntityType - entityType으로 설정 목록을 조회한다")
+    @DisplayName("entityType으로 설정 목록을 조회한다")
     fun testFindByEntityType() {
         // given
         vectorConfigRepository.save(
@@ -104,15 +86,9 @@ class VectorConfigRepositoryTest {
             .containsExactlyInAnyOrder("title", "content")
     }
 
-    /**
-     * findByEntityTypeAndFieldName 테스트 - 존재하는 경우
-     *
-     * Given: Post.title 설정 저장
-     * When: findByEntityTypeAndFieldName("Post", "title") 호출
-     * Then: 해당 설정 조회 성공
-     */
+    
     @Test
-    @DisplayName("testFindByEntityTypeAndFieldNameExists - entityType과 fieldName으로 설정을 조회한다")
+    @DisplayName("entityType과 fieldName으로 설정을 조회한다")
     fun testFindByEntityTypeAndFieldNameExists() {
         // given
         vectorConfigRepository.save(
@@ -127,15 +103,9 @@ class VectorConfigRepositoryTest {
         assertThat(config?.weight).isEqualTo(2.0)
     }
 
-    /**
-     * findByEntityTypeAndFieldName 테스트 - 존재하지 않는 경우
-     *
-     * Given: 설정 없음
-     * When: 존재하지 않는 fieldName으로 조회
-     * Then: null 반환
-     */
+    
     @Test
-    @DisplayName("testFindByEntityTypeAndFieldNameNotFound - 존재하지 않는 설정 조회 시 null을 반환한다")
+    @DisplayName("존재하지 않는 설정 조회 시 null을 반환한다")
     fun testFindByEntityTypeAndFieldNameNotFound() {
         // when
         val config = vectorConfigRepository.findByEntityTypeAndFieldName("Post", "nonexistent")
@@ -144,15 +114,9 @@ class VectorConfigRepositoryTest {
         assertThat(config).isNull()
     }
 
-    /**
-     * 복합 유니크 키 제약 테스트 - 중복 삽입 실패
-     *
-     * Given: Post.title 설정 이미 존재
-     * When: 동일한 entityType + fieldName으로 재삽입 시도
-     * Then: DataIntegrityViolationException 발생 (UNIQUE 제약)
-     */
+    
     @Test
-    @DisplayName("testUniqueConstraintViolation - 중복된 entityType과 fieldName 삽입 시 예외가 발생한다")
+    @DisplayName("중복된 entityType과 fieldName 삽입 시 예외가 발생한다")
     fun testUniqueConstraintViolation() {
         // given
         vectorConfigRepository.save(
@@ -167,15 +131,9 @@ class VectorConfigRepositoryTest {
         }
     }
 
-    /**
-     * VectorConfig 수정 테스트
-     *
-     * Given: 기존 설정 저장
-     * When: weight, threshold, enabled 필드 수정 후 save()
-     * Then: 수정된 값으로 업데이트 성공
-     */
+    
     @Test
-    @DisplayName("testUpdate - VectorConfig 필드를 수정한다")
+    @DisplayName("VectorConfig 필드를 수정한다")
     fun testUpdate() {
         // given
         val config = vectorConfigRepository.save(
@@ -194,15 +152,9 @@ class VectorConfigRepositoryTest {
         assertThat(updated.enabled).isFalse()
     }
 
-    /**
-     * VectorConfig 삭제 테스트
-     *
-     * Given: 기존 설정 저장
-     * When: delete() 호출
-     * Then: 조회 시 Empty 반환 (물리적 삭제)
-     */
+    
     @Test
-    @DisplayName("testDelete - VectorConfig를 삭제한다")
+    @DisplayName("VectorConfig를 삭제한다")
     fun testDelete() {
         // given
         val config = vectorConfigRepository.save(
@@ -218,15 +170,9 @@ class VectorConfigRepositoryTest {
         assertThat(found).isEmpty
     }
 
-    /**
-     * 모든 VectorConfig 조회 테스트
-     *
-     * Given: 여러 설정 저장
-     * When: findAll() 호출
-     * Then: 모든 설정 조회 (최소 2개 이상)
-     */
+    
     @Test
-    @DisplayName("testFindAll - 모든 VectorConfig 설정을 조회한다")
+    @DisplayName("모든 VectorConfig 설정을 조회한다")
     fun testFindAll() {
         // given
         vectorConfigRepository.save(
@@ -247,15 +193,9 @@ class VectorConfigRepositoryTest {
     // Phase 4: QueryDSL 동적 필터링 테스트 (T042-T045)
     // ===========================
 
-    /**
-     * T043: findByFilters - entityType 필터만 적용
-     *
-     * Given: Post(2개), Comment(1개) 설정 저장
-     * When: findByFilters(entityType="Post", fieldName=null, enabled=null) 호출
-     * Then: Post 타입 설정 2개만 조회
-     */
+
     @Test
-    @DisplayName("T043: findByFiltersEntityTypeOnly - entityType 필터만 적용")
+    @DisplayName("entityType 필터만 적용")
     fun testFindByFiltersEntityTypeOnly() {
         // given
         vectorConfigRepository.save(
@@ -281,15 +221,9 @@ class VectorConfigRepositoryTest {
             .containsExactlyInAnyOrder("title", "content")
     }
 
-    /**
-     * T044: findByFilters - 모든 파라미터 null (전체 조회)
-     *
-     * Given: 여러 설정 저장
-     * When: findByFilters(null, null, null) 호출
-     * Then: 모든 VectorConfig 반환
-     */
+
     @Test
-    @DisplayName("T044: findByFiltersAllNull - 모든 파라미터 null 시 전체 조회")
+    @DisplayName("모든 파라미터 null 시 전체 조회")
     fun testFindByFiltersAllNull() {
         // given
         vectorConfigRepository.save(
@@ -310,15 +244,9 @@ class VectorConfigRepositoryTest {
         assertThat(allConfigs).hasSizeGreaterThanOrEqualTo(2)
     }
 
-    /**
-     * T045: findByFilters - 여러 조건 결합
-     *
-     * Given: Post.title(enabled=true), Post.content(enabled=false), Comment.text(enabled=true) 저장
-     * When: findByFilters(entityType="Post", fieldName="title", enabled=true) 호출
-     * Then: Post.title 설정 1개만 조회
-     */
+
     @Test
-    @DisplayName("T045: findByFiltersMultipleConditions - entityType + fieldName + enabled 결합")
+    @DisplayName("entityType + fieldName + enabled 결합")
     fun testFindByFiltersMultipleConditions() {
         // given
         vectorConfigRepository.save(

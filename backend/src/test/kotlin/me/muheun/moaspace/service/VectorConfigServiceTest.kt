@@ -15,14 +15,6 @@ import org.springframework.transaction.annotation.Transactional
 import jakarta.persistence.EntityManager
 import kotlin.system.measureTimeMillis
 
-/**
- * VectorConfigService 통합 테스트
- *
- * Constitution Principle V 준수: Real Database Integration
- * - @SpringBootTest로 전체 컨텍스트 로드
- * - 실제 DB 사용 (Mock 금지)
- * - @Transactional로 각 테스트 격리 및 롤백
- */
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
@@ -41,7 +33,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("create - 새로운 벡터 설정을 생성한다")
+    @DisplayName("새로운 벡터 설정을 생성한다")
     fun testCreate() {
         // given
         val request = VectorConfigCreateRequest(
@@ -69,7 +61,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("create - 중복된 설정 생성 시 예외 발생")
+    @DisplayName("중복된 설정 생성 시 예외 발생")
     fun testCreateDuplicate() {
         // given
         val request = VectorConfigCreateRequest(
@@ -87,7 +79,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("findAll - 모든 벡터 설정을 조회한다")
+    @DisplayName("모든 벡터 설정을 조회한다")
     fun testFindAll() {
         // given
         vectorConfigService.create(
@@ -107,7 +99,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("findById - ID로 벡터 설정을 조회한다")
+    @DisplayName("ID로 벡터 설정을 조회한다")
     fun testFindById() {
         // given
         val created = vectorConfigService.create(
@@ -124,7 +116,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("findById - 존재하지 않는 ID 조회 시 예외 발생")
+    @DisplayName("존재하지 않는 ID 조회 시 예외 발생")
     fun testFindByIdNotFound() {
         // when & then
         val exception = assertThrows<NoSuchElementException> {
@@ -134,7 +126,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("findByEntityType - 엔티티 타입별 설정을 조회한다 (캐시 적용)")
+    @DisplayName("엔티티 타입별 설정을 조회한다 (캐시 적용)")
     fun testFindByEntityType() {
         // given
         vectorConfigService.create(
@@ -161,7 +153,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("findByEntityTypeAndFieldName - 엔티티+필드로 설정을 조회한다 (캐시 적용)")
+    @DisplayName("엔티티+필드로 설정을 조회한다 (캐시 적용)")
     fun testFindByEntityTypeAndFieldName() {
         // given
         vectorConfigService.create(
@@ -179,7 +171,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("findByEntityTypeAndFieldName - 존재하지 않는 설정 조회 시 null 반환")
+    @DisplayName("존재하지 않는 설정 조회 시 null 반환")
     fun testFindByEntityTypeAndFieldNameNotFound() {
         // when
         val response = vectorConfigService.findByEntityTypeAndFieldName("Post", "nonexistent")
@@ -208,7 +200,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("update - 벡터 설정의 weight를 수정한다 (@CacheEvict 적용)")
+    @DisplayName("벡터 설정의 weight를 수정한다 (@CacheEvict 적용)")
     fun testUpdateWeight() {
         // given
         val created = vectorConfigService.create(
@@ -231,7 +223,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("update - 벡터 설정의 threshold를 수정한다")
+    @DisplayName("벡터 설정의 threshold를 수정한다")
     fun testUpdateThreshold() {
         // given
         val created = vectorConfigService.create(
@@ -248,7 +240,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("update - 벡터 설정의 enabled를 수정한다")
+    @DisplayName("벡터 설정의 enabled를 수정한다")
     fun testUpdateEnabled() {
         // given
         val created = vectorConfigService.create(
@@ -264,7 +256,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("update - 여러 필드를 동시에 수정한다")
+    @DisplayName("여러 필드를 동시에 수정한다")
     fun testUpdateMultipleFields() {
         // given
         val created = vectorConfigService.create(
@@ -282,7 +274,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("update - 존재하지 않는 설정 수정 시 예외 발생")
+    @DisplayName("존재하지 않는 설정 수정 시 예외 발생")
     fun testUpdateNotFound() {
         // given
         val updateRequest = VectorConfigUpdateRequest(weight = 3.0)
@@ -295,7 +287,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("delete - 벡터 설정을 삭제한다 (@CacheEvict 적용)")
+    @DisplayName("벡터 설정을 삭제한다 (@CacheEvict 적용)")
     fun testDelete() {
         // given
         val created = vectorConfigService.create(
@@ -317,7 +309,7 @@ class VectorConfigServiceTest @Autowired constructor(
     }
 
     @Test
-    @DisplayName("delete - 존재하지 않는 설정 삭제 시 예외 발생")
+    @DisplayName("존재하지 않는 설정 삭제 시 예외 발생")
     fun testDeleteNotFound() {
         // when & then
         val exception = assertThrows<NoSuchElementException> {

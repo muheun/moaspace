@@ -10,7 +10,7 @@
         SELECT
             v.record_key as recordKey,
             MAX(1 - (v.chunk_vector &lt;=&gt; CAST(#{queryVector} AS vector))) as score
-        FROM vector_chunk v
+        FROM vector_chunks v
         WHERE v.chunk_vector IS NOT NULL
         <if test="namespace != null">
             AND v.namespace = #{namespace}
@@ -37,7 +37,7 @@
                     PARTITION BY v.namespace, v.entity, v.record_key
                     ORDER BY (1 - (v.chunk_vector &lt;=&gt; CAST(#{queryVector} AS vector))) DESC
                 ) as rank
-            FROM vector_chunk v
+            FROM vector_chunks v
             WHERE v.chunk_vector IS NOT NULL
             <if test="namespace != null">
                 AND v.namespace = #{namespace}
@@ -62,18 +62,18 @@
         LIMIT #{limit}
     </select>
 
-    <!-- 필드별 가중치 적용 검색 -->
+    <!-- 필드별 가중치 적용 검색 (T027: Phase 4 개선 - vector_configs JOIN) -->
+    <!-- Constitution Principle II, III: 필드별 가중치 및 임계값 필터링 -->
+    <!-- SC-003: title weight=3.0 → content 대비 최소 2배 이상 높은 스코어 -->
+    <!-- SC-006: threshold=0.7 → 0.65 제외 (임계값 경계 테스트) -->
     <select id="findByWeightedFieldScore" resultType="me.muheun.moaspace.query.dto.WeightedScore">
-        WITH weighted_scores AS (
+        WITH field_scores AS (
+            -- Step 1: 각 레코드의 필드별 최고 스코어 계산
             SELECT
                 v.record_key,
                 v.field_name,
-                CASE
-                    WHEN v.field_name = 'title' THEN (1 - (v.chunk_vector &lt;=&gt; CAST(#{queryVector} AS vector))) * #{titleWeight}
-                    WHEN v.field_name = 'content' THEN (1 - (v.chunk_vector &lt;=&gt; CAST(#{queryVector} AS vector))) * #{contentWeight}
-                    ELSE 0
-                END as weighted_score
-            FROM vector_chunk v
+                MAX(1 - (v.chunk_vector &lt;=&gt; CAST(#{queryVector} AS vector))) AS field_max_score
+            FROM vector_chunks v
             WHERE v.chunk_vector IS NOT NULL
             <if test="namespace != null">
                 AND v.namespace = #{namespace}
@@ -81,20 +81,37 @@
             <if test="entity != null">
                 AND v.entity = #{entity}
             </if>
+            GROUP BY v.record_key, v.field_name
+        ),
+        weighted_scores AS (
+            -- Step 2: vector_configs에서 가중치 및 임계값 적용
+            SELECT
+                fs.record_key,
+                fs.field_name,
+                fs.field_max_score,
+                vc.weight,
+                vc.threshold,
+                (fs.field_max_score * vc.weight) AS weighted_score
+            FROM field_scores fs
+            INNER JOIN vector_configs vc
+                ON vc.entity_type = #{entity}
+                AND vc.field_name = fs.field_name
+                AND vc.enabled = TRUE
+            WHERE fs.field_max_score &gt;= vc.threshold
         )
+        -- Step 3: 필드별 가중치 스코어 반환
         SELECT
-            record_key as recordKey,
-            field_name as fieldName,
-            weighted_score as weightedScore
-        FROM weighted_scores
-        WHERE weighted_score > 0
-        ORDER BY weighted_score DESC
+            ws.record_key AS recordKey,
+            ws.field_name AS fieldName,
+            ws.weighted_score AS weightedScore
+        FROM weighted_scores ws
+        ORDER BY ws.weighted_score DESC, ws.record_key
         LIMIT #{limit}
     </select>
 
     <!-- 필터 기반 삭제 -->
     <delete id="deleteByFilters">
-        DELETE FROM vector_chunk
+        DELETE FROM vector_chunks
         WHERE namespace = #{namespace}
           AND entity = #{entity}
           AND record_key = #{recordKey}

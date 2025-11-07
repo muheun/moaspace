@@ -25,7 +25,7 @@ class VectorConfigRequestValidationTest {
     // ========== VectorConfigCreateRequest 검증 ==========
 
     @Test
-    @DisplayName("VectorConfigCreateRequest - 모든 필드 유효한 경우 검증 통과")
+    @DisplayName("모든 필드 유효한 경우 검증 통과")
     fun testCreateRequestValid() {
         // given
         val request = VectorConfigCreateRequest(
@@ -44,7 +44,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigCreateRequest - entityType이 빈 문자열인 경우 검증 실패")
+    @DisplayName("entityType이 빈 문자열인 경우 검증 실패")
     fun testCreateRequestEmptyEntityType() {
         // given
         val request = VectorConfigCreateRequest(
@@ -62,7 +62,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigCreateRequest - fieldName이 빈 문자열인 경우 검증 실패")
+    @DisplayName("fieldName이 빈 문자열인 경우 검증 실패")
     fun testCreateRequestEmptyFieldName() {
         // given
         val request = VectorConfigCreateRequest(
@@ -80,7 +80,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigCreateRequest - entityType이 100자 초과인 경우 검증 실패")
+    @DisplayName("entityType이 100자 초과인 경우 검증 실패")
     fun testCreateRequestEntityTypeTooLong() {
         // given
         val longEntityType = "A".repeat(101)
@@ -99,7 +99,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigCreateRequest - fieldName이 100자 초과인 경우 검증 실패")
+    @DisplayName("fieldName이 100자 초과인 경우 검증 실패")
     fun testCreateRequestFieldNameTooLong() {
         // given
         val longFieldName = "A".repeat(101)
@@ -118,7 +118,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigCreateRequest - weight가 0.1 미만인 경우 검증 실패")
+    @DisplayName("weight가 0.1 미만인 경우 검증 실패")
     fun testCreateRequestWeightTooLow() {
         // given
         val request = VectorConfigCreateRequest(
@@ -138,7 +138,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigCreateRequest - weight가 10.0 초과인 경우 검증 실패")
+    @DisplayName("weight가 10.0 초과인 경우 검증 실패")
     fun testCreateRequestWeightTooHigh() {
         // given
         val request = VectorConfigCreateRequest(
@@ -158,7 +158,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigCreateRequest - threshold가 0.0 미만인 경우 검증 실패")
+    @DisplayName("threshold가 0.0 미만인 경우 검증 실패")
     fun testCreateRequestThresholdTooLow() {
         // given
         val request = VectorConfigCreateRequest(
@@ -179,7 +179,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigCreateRequest - threshold가 1.0 초과인 경우 검증 실패")
+    @DisplayName("threshold가 1.0 초과인 경우 검증 실패")
     fun testCreateRequestThresholdTooHigh() {
         // given
         val request = VectorConfigCreateRequest(
@@ -200,7 +200,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigCreateRequest - 경계값 테스트 (weight=0.1, threshold=0.0)")
+    @DisplayName("경계값 테스트 (weight=0.1, threshold=0.0)")
     fun testCreateRequestBoundaryValuesLow() {
         // given
         val request = VectorConfigCreateRequest(
@@ -218,7 +218,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigCreateRequest - 경계값 테스트 (weight=10.0, threshold=1.0)")
+    @DisplayName("경계값 테스트 (weight=10.0, threshold=1.0)")
     fun testCreateRequestBoundaryValuesHigh() {
         // given
         val request = VectorConfigCreateRequest(
@@ -238,7 +238,7 @@ class VectorConfigRequestValidationTest {
     // ========== VectorConfigUpdateRequest 검증 ==========
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - 모든 필드 null인 경우도 검증 통과 (부분 업데이트)")
+    @DisplayName("모든 필드 null인 경우도 검증 통과 (부분 업데이트)")
     fun testUpdateRequestAllNull() {
         // given
         val request = VectorConfigUpdateRequest()
@@ -251,7 +251,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - weight만 수정하는 경우 검증 통과")
+    @DisplayName("weight만 수정하는 경우 검증 통과")
     fun testUpdateRequestOnlyWeight() {
         // given
         val request = VectorConfigUpdateRequest(weight = 3.5)
@@ -264,7 +264,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - threshold만 수정하는 경우 검증 통과")
+    @DisplayName("threshold만 수정하는 경우 검증 통과")
     fun testUpdateRequestOnlyThreshold() {
         // given
         val request = VectorConfigUpdateRequest(threshold = 0.7)
@@ -277,7 +277,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - enabled만 수정하는 경우 검증 통과")
+    @DisplayName("enabled만 수정하는 경우 검증 통과")
     fun testUpdateRequestOnlyEnabled() {
         // given
         val request = VectorConfigUpdateRequest(enabled = false)
@@ -290,7 +290,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - weight가 0.1 미만인 경우 검증 실패")
+    @DisplayName("weight가 0.1 미만인 경우 검증 실패")
     fun testUpdateRequestWeightTooLow() {
         // given
         val request = VectorConfigUpdateRequest(weight = 0.05)
@@ -306,7 +306,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - weight가 10.0 초과인 경우 검증 실패")
+    @DisplayName("weight가 10.0 초과인 경우 검증 실패")
     fun testUpdateRequestWeightTooHigh() {
         // given
         val request = VectorConfigUpdateRequest(weight = 15.0)
@@ -322,7 +322,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - threshold가 0.0 미만인 경우 검증 실패")
+    @DisplayName("threshold가 0.0 미만인 경우 검증 실패")
     fun testUpdateRequestThresholdTooLow() {
         // given
         val request = VectorConfigUpdateRequest(threshold = -0.1)
@@ -338,7 +338,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - threshold가 1.0 초과인 경우 검증 실패")
+    @DisplayName("threshold가 1.0 초과인 경우 검증 실패")
     fun testUpdateRequestThresholdTooHigh() {
         // given
         val request = VectorConfigUpdateRequest(threshold = 1.5)
@@ -354,7 +354,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - 경계값 테스트 (weight=0.1)")
+    @DisplayName("경계값 테스트 (weight=0.1)")
     fun testUpdateRequestBoundaryWeightLow() {
         // given
         val request = VectorConfigUpdateRequest(weight = 0.1)
@@ -367,7 +367,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - 경계값 테스트 (weight=10.0)")
+    @DisplayName("경계값 테스트 (weight=10.0)")
     fun testUpdateRequestBoundaryWeightHigh() {
         // given
         val request = VectorConfigUpdateRequest(weight = 10.0)
@@ -380,7 +380,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - 경계값 테스트 (threshold=0.0)")
+    @DisplayName("경계값 테스트 (threshold=0.0)")
     fun testUpdateRequestBoundaryThresholdLow() {
         // given
         val request = VectorConfigUpdateRequest(threshold = 0.0)
@@ -393,7 +393,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - 경계값 테스트 (threshold=1.0)")
+    @DisplayName("경계값 테스트 (threshold=1.0)")
     fun testUpdateRequestBoundaryThresholdHigh() {
         // given
         val request = VectorConfigUpdateRequest(threshold = 1.0)
@@ -406,7 +406,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - 여러 필드 동시 수정 시 모두 유효한 경우 검증 통과")
+    @DisplayName("여러 필드 동시 수정 시 모두 유효한 경우 검증 통과")
     fun testUpdateRequestMultipleFieldsValid() {
         // given
         val request = VectorConfigUpdateRequest(
@@ -423,7 +423,7 @@ class VectorConfigRequestValidationTest {
     }
 
     @Test
-    @DisplayName("VectorConfigUpdateRequest - 여러 필드 중 하나라도 유효하지 않으면 검증 실패")
+    @DisplayName("여러 필드 중 하나라도 유효하지 않으면 검증 실패")
     fun testUpdateRequestMultipleFieldsInvalid() {
         // given
         val request = VectorConfigUpdateRequest(

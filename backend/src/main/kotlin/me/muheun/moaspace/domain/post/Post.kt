@@ -1,4 +1,4 @@
-package me.muheun.moaspace.domain
+package me.muheun.moaspace.domain.post
 
 import jakarta.persistence.*
 import me.muheun.moaspace.domain.user.User
