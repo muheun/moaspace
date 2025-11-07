@@ -32,7 +32,10 @@ class VectorSearchService(
     fun search(request: VectorSearchRequest): Map<String, Double> {
         logger.info("벡터 검색 시작: entity=${request.entity}, query=${request.query}")
 
-        val pgVector = vectorEmbeddingService.generateEmbedding(request.query)
+        val pgVector = vectorEmbeddingService.generateEmbedding(
+            text = request.query,
+            isQuery = true  // 검색어는 Query Prefix 사용
+        )
         val queryVector = FloatArray(pgVector.toArray().size) { i ->
             pgVector.toArray()[i].toFloat()
         }

@@ -1,15 +1,20 @@
 package me.muheun.moaspace.service
 
 import me.muheun.moaspace.domain.user.User
+import me.muheun.moaspace.domain.vector.VectorEntityType
 import me.muheun.moaspace.repository.UserRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 @Transactional(readOnly = true)
 class UserService(
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val vectorIndexingService: VectorIndexingService
 ) {
+
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
      * 사용자 ID로 조회
@@ -50,18 +55,40 @@ class UserService(
         name: String,
         profileImageUrl: String? = null
     ): User {
-        // 이메일 중복 확인
         if (userRepository.existsByEmail(email)) {
             throw IllegalArgumentException("이미 존재하는 이메일입니다: $email")
         }
 
+        return saveAndVectorize(email, name, profileImageUrl)
+    }
+
+    // User 저장 + 벡터화
+    private fun saveAndVectorize(
+        email: String,
+        name: String,
+        profileImageUrl: String?
+    ): User {
         val user = User(
             email = email,
             name = name,
             profileImageUrl = profileImageUrl
         )
 
-        return userRepository.save(user)
+        val savedUser = userRepository.save(user)
+        logger.info("사용자 저장 완료: userId=${savedUser.id}")
+
+        val vectorFields = vectorIndexingService.extractVectorFields(
+            entity = savedUser,
+            entityType = VectorEntityType.USER.typeName
+        )
+        vectorIndexingService.indexEntity(
+            entityType = VectorEntityType.USER.typeName,
+            recordKey = savedUser.id.toString(),
+            fields = vectorFields
+        )
+        logger.info("사용자 벡터화 완료: userId=${savedUser.id}")
+
+        return savedUser
     }
 
     /**
@@ -82,7 +109,7 @@ class UserService(
         profileImageUrl: String? = null
     ): User {
         return userRepository.findByEmail(email).orElseGet {
-            createUser(email, name, profileImageUrl)
+            saveAndVectorize(email, name, profileImageUrl)
         }
     }
 

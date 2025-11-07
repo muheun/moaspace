@@ -1,6 +1,7 @@
 package me.muheun.moaspace.service
 
 import me.muheun.moaspace.domain.post.Post
+import me.muheun.moaspace.domain.vector.VectorEntityType
 import me.muheun.moaspace.dto.CreatePostRequest
 import me.muheun.moaspace.dto.PostSearchRequest
 import me.muheun.moaspace.dto.UpdatePostRequest
@@ -53,13 +54,14 @@ class PostService(
         val savedPost = postRepository.save(post)
         logger.info("게시글 저장 완료: postId=${savedPost.id}")
 
+        val vectorFields = vectorIndexingService.extractVectorFields(
+            entity = savedPost,
+            entityType = VectorEntityType.POST.typeName
+        )
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = savedPost.id.toString(),
-            fields = mapOf(
-                "title" to sanitizedTitle,
-                "content" to contentText
-            )
+            fields = vectorFields
         )
         logger.info("게시글 벡터화 완료: postId=${savedPost.id}")
 
@@ -239,13 +241,14 @@ class PostService(
         val updatedPost = postRepository.save(post)
         logger.info("게시글 업데이트 완료: postId=$postId")
 
+        val vectorFields = vectorIndexingService.extractVectorFields(
+            entity = updatedPost,
+            entityType = VectorEntityType.POST.typeName
+        )
         vectorIndexingService.reindexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = updatedPost.id.toString(),
-            fields = mapOf(
-                "title" to post.title,
-                "content" to post.contentText
-            )
+            fields = vectorFields
         )
         logger.info("게시글 벡터 재생성 완료: postId=$postId")
 

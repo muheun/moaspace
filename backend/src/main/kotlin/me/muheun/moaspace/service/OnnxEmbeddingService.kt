@@ -120,20 +120,31 @@ class OnnxEmbeddingService : VectorEmbeddingService {
     /**
      * 텍스트를 벡터로 변환
      *
+     * E5 모델 Asymmetric Search 지원:
+     * - isQuery=true: "query: " prefix 추가 (검색어)
+     * - isQuery=false: "passage: " prefix 추가 (문서, 기본값)
+     *
      * 토큰화 → ONNX 추론 → Mean Pooling → L2 정규화 과정을 거쳐 768차원 벡터를 생성합니다.
      *
      * Semaphore를 사용하여 제한된 병렬 처리를 지원합니다.
      * 최대 maxConcurrent개의 스레드가 동시에 실행 가능하며, 나머지는 대기합니다.
      */
-    override fun generateEmbedding(text: String): PGvector {
+    override fun generateEmbedding(text: String, isQuery: Boolean): PGvector {
         require(text.isNotBlank()) { "입력 텍스트가 비어있습니다" }
+
+        // E5 모델 Asymmetric Search Prefix 처리
+        val prefixedText = if (isQuery) {
+            "query: $text"
+        } else {
+            "passage: $text"
+        }
 
         // Semaphore permit 획득 (대기 가능)
         semaphore.acquire()
 
         try {
             // 토큰화
-            val encoding = tokenizer.encode(text)
+            val encoding = tokenizer.encode(prefixedText)
             var inputIds = encoding.ids
             var attentionMask = encoding.attentionMask
 

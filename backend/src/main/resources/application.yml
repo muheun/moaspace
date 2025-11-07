@@ -90,8 +90,13 @@ jwt:
 frontend:
   url: ${FRONTEND_URL:http://localhost:3000}
 
-# 벡터 임베딩 설정
+# 벡터 시스템 설정
 vector:
+  # 네임스페이스 설정 (멀티테넌시 격리 단위)
+  namespace: ${VECTOR_NAMESPACE:moaspace}
+  multi-tenant: false
+
+  # 임베딩 설정
   embedding:
     provider: onnx
     model-path: ${ONNX_MODEL_PATH}
@@ -117,5 +122,4 @@ vector:
 
     # 기본 설정값
     defaults:
-      namespace: vector_ai  # 기본 네임스페이스
       search-limit: 10  # 검색 시 기본 limit

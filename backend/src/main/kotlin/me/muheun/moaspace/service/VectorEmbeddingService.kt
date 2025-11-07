@@ -13,9 +13,14 @@ interface VectorEmbeddingService {
     /**
      * 텍스트를 벡터로 변환
      *
+     * E5 모델 Asymmetric Search 지원:
+     * - isQuery=true: "query: " prefix 추가 (검색어)
+     * - isQuery=false: "passage: " prefix 추가 (문서, 기본값)
+     *
      * @param text 벡터화할 텍스트
+     * @param isQuery true: Query (검색어), false: Passage (문서)
      * @return PGvector 객체 (L2 정규화된 벡터)
      * @throws IllegalArgumentException 빈 문자열 또는 null 입력
      */
-    fun generateEmbedding(text: String): PGvector
+    fun generateEmbedding(text: String, isQuery: Boolean = false): PGvector
 }

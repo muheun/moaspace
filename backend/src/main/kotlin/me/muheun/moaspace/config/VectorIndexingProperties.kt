@@ -23,7 +23,7 @@ data class VectorIndexingProperties(
     var fieldWeights: Map<String, EntityFieldWeights> = emptyMap(),
 
     /**
-     * 네임스페이스 및 엔티티 기본값
+     * 기본 설정값
      */
     var defaults: DefaultsConfig = DefaultsConfig()
 ) {
@@ -53,9 +53,6 @@ data class VectorIndexingProperties(
      * 기본 설정값
      */
     data class DefaultsConfig(
-        /** 기본 네임스페이스 */
-        var namespace: String = "vector_ai",
-
         /** 검색 시 기본 limit */
         var searchLimit: Int = 10
     )
