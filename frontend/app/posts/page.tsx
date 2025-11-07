@@ -90,7 +90,7 @@ export default function PostsPage() {
   // 에러 표시
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>오류가 발생했습니다</AlertTitle>
@@ -113,7 +113,7 @@ export default function PostsPage() {
 
   return (
     <ErrorBoundary>
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
         <header className="mb-8 flex items-start justify-between">
           <div>
             <h1 className="text-4xl font-bold mb-2">게시글 목록</h1>

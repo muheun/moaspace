@@ -76,7 +76,7 @@ export default function PostDetailPage({
    */
   if (isLoading) {
     return (
-      <main className="container mx-auto px-4 py-8 max-w-4xl" role="status" aria-label="게시글 로딩 중">
+      <main className="container mx-auto px-4 py-8 max-w-6xl" role="status" aria-label="게시글 로딩 중">
         <article>
           <header className="mb-8">
             <Skeleton className="h-10 w-3/4 mb-4" />
@@ -110,7 +110,7 @@ export default function PostDetailPage({
    */
   if (error || !post) {
     return (
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <main className="container mx-auto px-4 py-8 max-w-6xl">
         <section className="text-center py-16">
           <h1 className="text-2xl font-bold text-red-600 mb-4">
             게시글을 찾을 수 없습니다
@@ -126,7 +126,7 @@ export default function PostDetailPage({
 
   return (
     <ErrorBoundary>
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <main className="container mx-auto px-4 py-8 max-w-6xl">
         <article>
           <header className="mb-8">
             <h1 className="text-4xl font-bold mb-4">{post.title}</h1>
@@ -192,7 +192,7 @@ export default function PostDetailPage({
             {post.contentMarkdown ? (
               <MarkdownViewer content={post.contentMarkdown} />
             ) : post.contentHtml ? (
-              <div className="editor-input">
+              <div className="prose prose-slate dark:prose-invert max-w-none">
                 <div dangerouslySetInnerHTML={{ __html: post.contentHtml }} />
               </div>
             ) : (
