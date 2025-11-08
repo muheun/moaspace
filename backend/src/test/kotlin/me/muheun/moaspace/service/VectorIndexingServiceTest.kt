@@ -1,6 +1,8 @@
 package me.muheun.moaspace.service
 
 import me.muheun.moaspace.domain.vector.VectorConfig
+import me.muheun.moaspace.domain.vector.VectorEntityType
+import me.muheun.moaspace.helper.VectorTestHelper
 import me.muheun.moaspace.repository.VectorChunkRepository
 import me.muheun.moaspace.repository.VectorConfigRepository
 import org.assertj.core.api.Assertions.assertThat
@@ -22,6 +24,7 @@ class VectorIndexingServiceTest @Autowired constructor(
     private val vectorIndexingService: VectorIndexingService,
     private val vectorConfigRepository: VectorConfigRepository,
     private val vectorChunkRepository: VectorChunkRepository,
+    private val vectorTestHelper: VectorTestHelper,
     private val entityManager: EntityManager,
     private val cacheManager: org.springframework.cache.CacheManager
 ) {
@@ -38,25 +41,26 @@ class VectorIndexingServiceTest @Autowired constructor(
         entityManager.flush()
         entityManager.clear()
 
-        // VectorConfig 초기 데이터 생성
+        // VectorConfig 초기 데이터 생성 (namespace는 엔티티 기본값 "moaspace" 사용)
         vectorConfigRepository.saveAll(listOf(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, threshold = 0.0, enabled = true),
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, threshold = 0.0, enabled = true)
+            VectorConfig(entityType = VectorEntityType.POST.typeName, fieldName = "title", weight = 2.0, threshold = 0.0, enabled = true),
+            VectorConfig(entityType = VectorEntityType.POST.typeName, fieldName = "contentText", weight = 1.0, threshold = 0.0, enabled = true)
         ))
+        entityManager.flush()
+        entityManager.clear()
     }
 
 
     @Test
     @DisplayName("단일 필드 벡터화 성공")
     fun testIndexEntitySingleField() {
-        // given: @BeforeEach에서 VectorConfig 이미 생성됨
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨 (namespace="moaspace")
 
-        // when
+        // when: title 필드만 벡터화
         val chunkCount = vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = "1",
-            fields = mapOf("title" to "테스트 제목"),
-            namespace = "vector_ai"
+            fields = mapOf("title" to "테스트 제목")
         )
 
         // then
@@ -64,7 +68,8 @@ class VectorIndexingServiceTest @Autowired constructor(
 
         val chunks = vectorChunkRepository.findAll()
         assertThat(chunks).hasSize(1)
-        assertThat(chunks[0].entity).isEqualTo("Post")
+        assertThat(chunks[0].namespace).isEqualTo(vectorTestHelper.defaultNamespace)
+        assertThat(chunks[0].entity).isEqualTo(VectorEntityType.POST.typeName)
         assertThat(chunks[0].recordKey).isEqualTo("1")
         assertThat(chunks[0].fieldName).isEqualTo("title")
         assertThat(chunks[0].chunkText).isEqualTo("테스트 제목")
@@ -74,24 +79,31 @@ class VectorIndexingServiceTest @Autowired constructor(
     @Test
     @DisplayName("여러 필드 동시 벡터화")
     fun testIndexEntityMultipleFields() {
-        // given: @BeforeEach에서 VectorConfig 이미 생성됨
+        // given: @BeforeEach에서 VectorConfig 이미 생성됨 (title + contentText)
 
-        // when
+        // when: VectorConfig에 설정된 모든 필드 벡터화
         val chunkCount = vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = "1",
             fields = mapOf(
                 "title" to "게시글 제목",
-                "content" to "게시글 본문 내용"
+                "contentText" to "게시글 본문 내용"
             )
         )
 
-        // then
-        assertThat(chunkCount).isEqualTo(2)
+        // then: VectorConfig 개수만큼 생성
+        val expectedFieldCount = vectorConfigRepository
+            .findByNamespaceAndEntityTypeAndEnabled(vectorTestHelper.defaultNamespace, VectorEntityType.POST.typeName, true)
+            .size
+        assertThat(chunkCount).isEqualTo(expectedFieldCount)
 
         val chunks = vectorChunkRepository.findAll()
-        assertThat(chunks).hasSize(2)
-        assertThat(chunks.map { it.fieldName }).containsExactlyInAnyOrder("title", "content")
+        assertThat(chunks).hasSize(expectedFieldCount)
+
+        val expectedFieldNames = vectorConfigRepository
+            .findByNamespaceAndEntityTypeAndEnabled(vectorTestHelper.defaultNamespace, VectorEntityType.POST.typeName, true)
+            .map { it.fieldName }
+        assertThat(chunks.map { it.fieldName }).containsExactlyInAnyOrderElementsOf(expectedFieldNames)
     }
 
 
@@ -106,19 +118,19 @@ class VectorIndexingServiceTest @Autowired constructor(
             cacheManager.getCache(cacheName)?.clear()
         }
         vectorConfigRepository.saveAll(listOf(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, enabled = true),
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, enabled = false)
+            VectorConfig(entityType = VectorEntityType.POST.typeName, fieldName = "title", weight = 2.0, enabled = true),
+            VectorConfig(entityType = VectorEntityType.POST.typeName, fieldName = "content", weight = 1.0, enabled = false)
         ))
         entityManager.flush()
         entityManager.clear()
 
         // when
         val chunkCount = vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = "1",
             fields = mapOf(
                 "title" to "게시글 제목",
-                "content" to "게시글 본문"
+                "contentText" to "게시글 본문"
             )
         )
 
@@ -145,9 +157,9 @@ class VectorIndexingServiceTest @Autowired constructor(
         val largeContent = "테스트 ".repeat(2000) // 10,000자 (한글 포함)
 
         val chunkCount = vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = "memory-test",
-            fields = mapOf("content" to largeContent)
+            fields = mapOf("contentText" to largeContent)
         )
 
         // 최종 메모리 상태 (GC 후)
@@ -186,9 +198,9 @@ class VectorIndexingServiceTest @Autowired constructor(
 
         // when
         val chunkCount = vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = "large-content",
-            fields = mapOf("content" to largeContent)
+            fields = mapOf("contentText" to largeContent)
         )
 
         // then: SC-002 검증 (10,000자 → 약 22개 청크)
@@ -223,11 +235,11 @@ class VectorIndexingServiceTest @Autowired constructor(
 
         // when: 모든 필드가 blank
         val chunkCount = vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = "blank-fields",
             fields = mapOf(
                 "title" to "",
-                "content" to "   "
+                "contentText" to "   "
             )
         )
 
@@ -245,11 +257,11 @@ class VectorIndexingServiceTest @Autowired constructor(
 
         // when
         val chunkCount = vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = "partial-blank",
             fields = mapOf(
                 "title" to "정상 제목",
-                "content" to "" // blank 필드
+                "contentText" to "" // blank 필드
             )
         )
 
@@ -267,21 +279,21 @@ class VectorIndexingServiceTest @Autowired constructor(
         // given: @BeforeEach에서 VectorConfig 이미 생성됨 + 초기 인덱싱
 
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = "1",
             fields = mapOf(
                 "title" to "기존 제목",
-                "content" to "기존 본문"
+                "contentText" to "기존 본문"
             )
         )
 
         // when: 재인덱싱
         val reindexCount = vectorIndexingService.reindexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = "1",
             fields = mapOf(
                 "title" to "새 제목",
-                "content" to "새 본문"
+                "contentText" to "새 본문"
             )
         )
 
@@ -299,17 +311,17 @@ class VectorIndexingServiceTest @Autowired constructor(
         // given: @BeforeEach에서 VectorConfig 이미 생성됨
 
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = "1",
             fields = mapOf(
                 "title" to "제목",
-                "content" to "본문"
+                "contentText" to "본문"
             )
         )
 
         // when
         val deletedCount = vectorIndexingService.deleteEntityIndex(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = "1"
         )
 
@@ -326,17 +338,17 @@ class VectorIndexingServiceTest @Autowired constructor(
         // given: @BeforeEach에서 VectorConfig 이미 생성됨 + 초기 인덱싱
 
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = "1",
             fields = mapOf(
                 "title" to "기존 제목",
-                "content" to "기존 본문"
+                "contentText" to "기존 본문"
             )
         )
 
         // when: title 필드만 재인덱싱
         val reindexCount = vectorIndexingService.reindexField(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = "1",
             fieldName = "title",
             fieldValue = "수정된 제목"
@@ -345,10 +357,10 @@ class VectorIndexingServiceTest @Autowired constructor(
         // then
         assertThat(reindexCount).isEqualTo(1)
         val chunks = vectorChunkRepository.findAll()
-        assertThat(chunks).hasSize(2) // title + content
+        assertThat(chunks).hasSize(2) // title + contentText
 
         val titleChunk = chunks.find { it.fieldName == "title" }
-        val contentChunk = chunks.find { it.fieldName == "content" }
+        val contentChunk = chunks.find { it.fieldName == "contentText" }
         assertThat(titleChunk?.chunkText).isEqualTo("수정된 제목")
         assertThat(contentChunk?.chunkText).isEqualTo("기존 본문") // 유지됨
     }

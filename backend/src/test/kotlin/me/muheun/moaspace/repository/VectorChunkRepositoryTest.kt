@@ -108,7 +108,7 @@ class VectorChunkRepositoryTest {
 
         assertThat(results).isNotEmpty
         val titleScore = results.find { it.fieldName == "title" }?.weightedScore ?: 0.0
-        val contentScore = results.find { it.fieldName == "content" }?.weightedScore ?: 0.0
+        val contentScore = results.find { it.fieldName == "contentText" }?.weightedScore ?: 0.0
         assertThat(titleScore).isGreaterThan(contentScore) // title 가중치가 더 높음
     }
 

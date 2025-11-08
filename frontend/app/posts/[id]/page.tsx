@@ -13,13 +13,6 @@ import { DeleteConfirmDialog } from '@/components/posts/DeleteConfirmDialog';
 import { format } from 'date-fns';
 import MarkdownViewer from '@/components/ui/MarkdownViewer';
 
-/**
- * 게시글 상세 페이지
- * T090: Error Boundary 적용
- *
- * Constitution Principle VI: shadcn/ui 기반 컴포넌트 우선 아키텍처
- * Constitution Principle X: Semantic HTML, ARIA, Skeleton UI, Error Boundary
- */
 export default function PostDetailPage({
   params,
 }: {
@@ -37,43 +30,27 @@ export default function PostDetailPage({
 
   const isAuthor = user && post && user.id === post.author.id;
 
-  /**
-   * 게시글 수정 페이지로 이동
-   */
   const handleEdit = () => {
     router.push(`/posts/${postId}/edit`);
   };
 
-  /**
-   * 게시글 삭제 확인 다이얼로그 열기
-   */
   const handleDeleteClick = () => {
     setDeleteDialogOpen(true);
   };
 
-  /**
-   * 게시글 삭제 확인 (T086-T087)
-   * Optimistic update로 삭제 후 목록으로 리다이렉트
-   */
   const handleDeleteConfirm = () => {
     deletePostMutation.mutate(postId, {
       onSuccess: () => {
-        // T087: 삭제 성공 후 게시글 목록으로 리다이렉트
         toast.success('게시글이 삭제되었습니다');
         router.push('/posts');
       },
       onError: (error) => {
-        // 에러 처리 (권한 없음, 네트워크 오류 등)
         toast.error(error instanceof Error ? error.message : '게시글 삭제에 실패했습니다');
         setDeleteDialogOpen(false);
       },
     });
   };
 
-  /**
-   * 로딩 상태 (Skeleton UI)
-   * T089: Skeleton 컴포넌트로 로딩 상태 개선
-   */
   if (isLoading) {
     return (
       <main className="container mx-auto px-4 py-8 max-w-6xl" role="status" aria-label="게시글 로딩 중">
@@ -104,10 +81,6 @@ export default function PostDetailPage({
     );
   }
 
-  /**
-   * 에러 상태 (T088)
-   * 404 또는 삭제된 게시글 접근 시 메시지 표시
-   */
   if (error || !post) {
     return (
       <main className="container mx-auto px-4 py-8 max-w-6xl">
@@ -151,7 +124,6 @@ export default function PostDetailPage({
                 </div>
               </div>
 
-              {/* T084: 작성자에게만 수정/삭제 버튼 표시 */}
               {isAuthor && (
                 <div className="flex gap-2">
                   <Button
@@ -209,7 +181,6 @@ export default function PostDetailPage({
           </Button>
         </footer>
 
-        {/* T085: 삭제 확인 다이얼로그 */}
         <DeleteConfirmDialog
           open={deleteDialogOpen}
           onOpenChange={setDeleteDialogOpen}

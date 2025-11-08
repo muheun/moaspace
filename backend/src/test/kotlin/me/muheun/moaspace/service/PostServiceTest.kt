@@ -2,8 +2,10 @@ package me.muheun.moaspace.service
 
 import me.muheun.moaspace.domain.user.User
 import me.muheun.moaspace.domain.vector.VectorConfig
+import me.muheun.moaspace.domain.vector.VectorEntityType
 import me.muheun.moaspace.dto.CreatePostRequest
 import me.muheun.moaspace.dto.UpdatePostRequest
+import me.muheun.moaspace.helper.VectorTestHelper
 import me.muheun.moaspace.repository.PostRepository
 import me.muheun.moaspace.repository.UserRepository
 import me.muheun.moaspace.repository.VectorChunkRepository
@@ -29,6 +31,7 @@ class PostServiceTest @Autowired constructor(
     private val postRepository: PostRepository,
     private val vectorConfigRepository: VectorConfigRepository,
     private val vectorChunkRepository: VectorChunkRepository,
+    private val vectorTestHelper: VectorTestHelper,
     private val entityManager: EntityManager,
     private val cacheManager: org.springframework.cache.CacheManager
 ) {
@@ -49,11 +52,13 @@ class PostServiceTest @Autowired constructor(
         entityManager.flush()
         entityManager.clear()
 
-        // VectorConfig 초기 데이터 생성
+        // VectorConfig 초기 데이터 생성 (namespace는 엔티티 기본값 "moaspace" 사용)
         vectorConfigRepository.saveAll(listOf(
             VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, threshold = 0.0, enabled = true),
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, threshold = 0.0, enabled = true)
+            VectorConfig(entityType = "Post", fieldName = "contentText", weight = 1.0, threshold = 0.0, enabled = true)
         ))
+        entityManager.flush()
+        entityManager.clear()
 
         testUser = userRepository.save(
             User(
@@ -83,20 +88,34 @@ class PostServiceTest @Autowired constructor(
         assertThat(savedPost.title).isEqualTo("테스트 게시글 제목")
         assertThat(savedPost.contentText).contains("테스트 게시글 본문 내용입니다")
 
-        // then: 벡터화 확인 (title + content = 2개)
+        // then: 벡터화 확인 (VectorConfig 기반 동적 검증)
         val chunks = vectorChunkRepository.findAll()
-        assertThat(chunks).hasSize(2)
+        val expectedFieldNames = vectorConfigRepository
+            .findByNamespaceAndEntityTypeAndEnabled(
+                vectorTestHelper.defaultNamespace,
+                VectorEntityType.POST.typeName,
+                true
+            )
+            .map { it.fieldName }
+        assertThat(chunks.map { it.fieldName }).containsExactlyInAnyOrderElementsOf(expectedFieldNames)
 
+        // 모든 청크가 올바른 recordKey를 가지는지 확인
+        chunks.forEach { chunk ->
+            assertThat(chunk.recordKey).isEqualTo(savedPost.id.toString())
+            assertThat(chunk.chunkText).isNotBlank()
+        }
+
+        // title 필드 검증
         val titleChunk = chunks.find { it.fieldName == "title" }
-        val contentChunk = chunks.find { it.fieldName == "content" }
-
         assertThat(titleChunk).isNotNull()
-        assertThat(titleChunk?.recordKey).isEqualTo(savedPost.id.toString())
         assertThat(titleChunk?.chunkText).isEqualTo("테스트 게시글 제목")
 
-        assertThat(contentChunk).isNotNull()
-        assertThat(contentChunk?.recordKey).isEqualTo(savedPost.id.toString())
-        assertThat(contentChunk?.chunkText).contains("테스트 게시글 본문 내용입니다")
+        // contentText 필드 검증 (VectorConfig에 있는 경우만)
+        if (expectedFieldNames.contains("contentText")) {
+            val contentChunk = chunks.find { it.fieldName == "contentText" }
+            assertThat(contentChunk).isNotNull()
+            assertThat(contentChunk?.chunkText).contains("테스트 게시글 본문 내용입니다")
+        }
     }
 
 
@@ -161,7 +180,7 @@ class PostServiceTest @Autowired constructor(
         assertThat(updatedChunks).hasSize(2)
 
         val titleChunk = updatedChunks.find { it.fieldName == "title" }
-        val contentChunk = updatedChunks.find { it.fieldName == "content" }
+        val contentChunk = updatedChunks.find { it.fieldName == "contentText" }
 
         assertThat(titleChunk?.chunkText).isEqualTo("수정된 제목")
         assertThat(contentChunk?.chunkText).contains("수정된 본문")
@@ -222,7 +241,7 @@ class PostServiceTest @Autowired constructor(
 
         // then: VectorChunk도 순수 텍스트
         val chunks = vectorChunkRepository.findAll()
-        val contentChunk = chunks.find { it.fieldName == "content" }
+        val contentChunk = chunks.find { it.fieldName == "contentText" }
         assertThat(contentChunk?.chunkText).doesNotContain("<", ">")
         assertThat(contentChunk?.chunkText).contains("굵은글씨")
     }
@@ -249,7 +268,7 @@ class PostServiceTest @Autowired constructor(
         assertThat(chunks.size).isGreaterThan(1)
 
         // content 청크만 필터링
-        val contentChunks = chunks.filter { it.fieldName == "content" }
+        val contentChunks = chunks.filter { it.fieldName == "contentText" }
         assertThat(contentChunks.size).isGreaterThan(1) // content만으로도 여러 청크
 
         // 모든 청크는 동일한 recordKey

@@ -20,12 +20,6 @@ class JwtTokenService(
         Keys.hmacShaKeyFor(jwtSecret.toByteArray(StandardCharsets.UTF_8))
     }
 
-    /**
-     * 액세스 토큰 생성
-     * @param userId 사용자 ID
-     * @param email 사용자 이메일
-     * @return JWT 액세스 토큰
-     */
     fun generateAccessToken(userId: Long, email: String): String {
         val now = Date()
         val expiryDate = Date(now.time + accessTokenExpiration)
@@ -40,11 +34,6 @@ class JwtTokenService(
             .compact()
     }
 
-    /**
-     * 리프레시 토큰 생성
-     * @param userId 사용자 ID
-     * @return JWT 리프레시 토큰
-     */
     fun generateRefreshToken(userId: Long): String {
         val now = Date()
         val expiryDate = Date(now.time + refreshTokenExpiration)
@@ -58,31 +47,16 @@ class JwtTokenService(
             .compact()
     }
 
-    /**
-     * 토큰에서 사용자 ID 추출
-     * @param token JWT 토큰
-     * @return 사용자 ID
-     */
     fun getUserIdFromToken(token: String): Long {
         val claims = parseToken(token)
         return claims.subject.toLong()
     }
 
-    /**
-     * 토큰에서 이메일 추출
-     * @param token JWT 토큰
-     * @return 사용자 이메일 (액세스 토큰만 해당)
-     */
     fun getEmailFromToken(token: String): String? {
         val claims = parseToken(token)
         return claims["email"] as? String
     }
 
-    /**
-     * 토큰 유효성 검증
-     * @param token JWT 토큰
-     * @return 유효 여부
-     */
     fun validateToken(token: String): Boolean {
         return try {
             parseToken(token)
@@ -92,11 +66,6 @@ class JwtTokenService(
         }
     }
 
-    /**
-     * 토큰 파싱
-     * @param token JWT 토큰
-     * @return Claims 객체
-     */
     private fun parseToken(token: String): Claims {
         return Jwts.parser()
             .verifyWith(secretKey)
@@ -105,11 +74,6 @@ class JwtTokenService(
             .payload
     }
 
-    /**
-     * Bearer 토큰에서 순수 JWT 추출
-     * @param bearerToken "Bearer {token}" 형식
-     * @return JWT 토큰
-     */
     fun extractToken(bearerToken: String): String? {
         return if (bearerToken.startsWith("Bearer ")) {
             bearerToken.substring(7)
@@ -119,9 +83,7 @@ class JwtTokenService(
     }
 
     /**
-     * SecretKey 바이트 배열 반환
      * SecurityConfig의 NimbusJwtDecoder와 동일한 키 공유
-     * @return SecretKey 바이트 배열
      */
     fun getSecretKeyBytes(): ByteArray {
         return jwtSecret.toByteArray(StandardCharsets.UTF_8)

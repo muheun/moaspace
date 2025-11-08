@@ -71,8 +71,6 @@ interface VectorConfigRepository : JpaRepository<VectorConfig, Long>, VectorConf
         enabled: Boolean
     ): List<VectorConfig>
 
-    // ===== 하위 호환성 메서드 (Deprecated) =====
-
     /**
      * @deprecated namespace 파라미터 없는 메서드 (하위 호환성)
      * @see findByNamespaceAndEntityType

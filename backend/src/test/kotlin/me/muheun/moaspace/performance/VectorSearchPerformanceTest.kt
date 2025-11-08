@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager
 import me.muheun.moaspace.domain.post.Post
 import me.muheun.moaspace.domain.user.User
 import me.muheun.moaspace.domain.vector.VectorConfig
+import me.muheun.moaspace.domain.vector.VectorEntityType
 import me.muheun.moaspace.dto.PostSearchRequest
 import me.muheun.moaspace.repository.PostRepository
 import me.muheun.moaspace.repository.UserRepository
@@ -64,13 +65,13 @@ class VectorSearchPerformanceTest @Autowired constructor(
         vectorConfigRepository.saveAll(
             listOf(
                 VectorConfig(
-                    entityType = "Post",
+                    entityType = VectorEntityType.POST.typeName,
                     fieldName = "title",
                     enabled = true
                 ),
                 VectorConfig(
-                    entityType = "Post",
-                    fieldName = "content",
+                    entityType = VectorEntityType.POST.typeName,
+                    fieldName = "contentText",
                     enabled = true
                 )
             )
@@ -111,12 +112,12 @@ class VectorSearchPerformanceTest @Autowired constructor(
             val recordsFields = posts.map { post ->
                 post.id.toString() to mapOf(
                     "title" to post.title,
-                    "content" to post.contentText
+                    "contentText" to post.contentText
                 )
             }
 
             val chunkCount = vectorIndexingService.indexEntitiesBatch(
-                entityType = "Post",
+                entityType = VectorEntityType.POST.typeName,
                 recordsFields = recordsFields
             )
 
@@ -193,12 +194,12 @@ class VectorSearchPerformanceTest @Autowired constructor(
         val recordsFields = posts.map { post ->
             post.id.toString() to mapOf(
                 "title" to post.title,
-                "content" to post.contentText
+                "contentText" to post.contentText
             )
         }
 
         vectorIndexingService.indexEntitiesBatch(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordsFields = recordsFields
         )
 

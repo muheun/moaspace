@@ -6,6 +6,8 @@ import me.muheun.moaspace.domain.user.User
 import me.muheun.moaspace.dto.CreatePostRequest
 import me.muheun.moaspace.dto.UpdatePostRequest
 import me.muheun.moaspace.domain.vector.VectorConfig
+import me.muheun.moaspace.domain.vector.VectorEntityType
+import me.muheun.moaspace.helper.VectorTestHelper
 import me.muheun.moaspace.repository.PostRepository
 import me.muheun.moaspace.repository.UserRepository
 import me.muheun.moaspace.repository.VectorChunkRepository
@@ -46,6 +48,9 @@ class PostControllerTest {
     @Autowired
     private lateinit var vectorConfigRepository: VectorConfigRepository
 
+    @Autowired
+    private lateinit var vectorTestHelper: VectorTestHelper
+
     @BeforeEach
     fun setUp() {
         cacheManager.cacheNames.forEach { cacheName ->
@@ -56,11 +61,13 @@ class PostControllerTest {
         entityManager.flush()
         entityManager.clear()
 
-        // VectorConfig 초기 데이터 생성
+        // VectorConfig 초기 데이터 생성 (namespace는 엔티티 기본값 "moaspace" 사용)
         vectorConfigRepository.saveAll(listOf(
-            VectorConfig(entityType = "Post", fieldName = "title", weight = 2.0, threshold = 0.0, enabled = true),
-            VectorConfig(entityType = "Post", fieldName = "content", weight = 1.0, threshold = 0.0, enabled = true)
+            VectorConfig(entityType = VectorEntityType.POST.typeName, fieldName = "title", weight = 2.0, threshold = 0.0, enabled = true),
+            VectorConfig(entityType = VectorEntityType.POST.typeName, fieldName = "contentText", weight = 1.0, threshold = 0.0, enabled = true)
         ))
+        entityManager.flush()
+        entityManager.clear()
     }
 
     @Autowired
@@ -123,8 +130,8 @@ class PostControllerTest {
         assert(!post.deleted) { "생성된 게시글이 삭제 상태입니다" }
 
         val chunks = vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc(
-            namespace = "vector_ai",
-            entity = "Post",
+            namespace = vectorTestHelper.defaultNamespace,
+            entity = VectorEntityType.POST.typeName,
             recordKey = postId.toString()
         )
         assert(chunks.isNotEmpty()) { "VectorChunk가 자동 생성되지 않았습니다" }
@@ -220,8 +227,8 @@ class PostControllerTest {
 
         // VectorChunk 확인 (PostEmbedding → VectorChunk 마이그레이션)
         val chunks = vectorChunkRepository.findByNamespaceAndEntityAndRecordKeyOrderByChunkIndexAsc(
-            namespace = "vector_ai",
-            entity = "Post",
+            namespace = vectorTestHelper.defaultNamespace,
+            entity = VectorEntityType.POST.typeName,
             recordKey = updatedPost.id.toString()
         )
         assert(chunks.isNotEmpty()) { "VectorChunk가 재생성되지 않았습니다" }

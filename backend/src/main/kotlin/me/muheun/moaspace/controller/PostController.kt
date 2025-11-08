@@ -1,6 +1,8 @@
 package me.muheun.moaspace.controller
 
 import jakarta.validation.Valid
+import me.muheun.moaspace.config.VectorProperties
+import me.muheun.moaspace.domain.vector.VectorEntityType
 import me.muheun.moaspace.dto.*
 import me.muheun.moaspace.service.PostService
 import org.slf4j.LoggerFactory
@@ -17,6 +19,7 @@ import java.time.LocalDateTime
 @RequestMapping("/api/posts")
 class PostController(
     private val postService: PostService,
+    private val vectorProperties: VectorProperties,
     private val vectorChunkRepository: me.muheun.moaspace.repository.VectorChunkRepository,
     private val postRepository: me.muheun.moaspace.repository.PostRepository,
     private val vectorEmbeddingService: me.muheun.moaspace.service.VectorEmbeddingService
@@ -110,8 +113,8 @@ class PostController(
         // 2. VectorChunk 기반 레코드별 유사도 검색
         val recordScores = vectorChunkRepository.findSimilarRecords(
             queryVector = queryVector,
-            namespace = "vector_ai",
-            entity = "Post",
+            namespace = vectorProperties.namespace,
+            entity = VectorEntityType.POST.typeName,
             limit = request.limit
         )
 

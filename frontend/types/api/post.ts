@@ -1,6 +1,3 @@
-// Frontend API Types (Backend DTO와 수동 동기화)
-// Constitution Principle X: API 타입은 frontend/types/api/ 디렉토리에 정의
-
 export interface PostDto {
   id: number;
   title: string;
@@ -43,7 +40,6 @@ export interface VectorSearchResponse {
   }>;
 }
 
-// Phase 6: 필드별 가중치 검색 타입 (User Story 4)
 export type PostSearchField = 'title' | 'content' | 'hashtags' | 'author';
 
 export interface PostSearchRequest {

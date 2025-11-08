@@ -13,6 +13,7 @@ import org.springframework.security.web.authentication.SimpleUrlAuthenticationSu
 import org.springframework.stereotype.Component
 import org.springframework.web.util.UriComponentsBuilder
 
+// OAuth2 인증 성공 시 JWT 발급 및 프론트엔드 리다이렉트 처리
 @Component
 class OAuth2SuccessHandler(
     private val userService: UserService,
@@ -22,13 +23,6 @@ class OAuth2SuccessHandler(
 
     private val logger = LoggerFactory.getLogger(OAuth2SuccessHandler::class.java)
 
-    /**
-     * OAuth2 인증 성공 시 호출
-     *
-     * @param request HTTP 요청
-     * @param response HTTP 응답
-     * @param authentication 인증 정보 (OAuth2User 포함)
-     */
     override fun onAuthenticationSuccess(
         request: HttpServletRequest,
         response: HttpServletResponse,

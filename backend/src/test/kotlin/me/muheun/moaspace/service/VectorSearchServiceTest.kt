@@ -3,7 +3,7 @@ package me.muheun.moaspace.service
 import me.muheun.moaspace.domain.user.User
 import me.muheun.moaspace.domain.post.Post
 import me.muheun.moaspace.domain.vector.VectorConfig
-import me.muheun.moaspace.dto.PostSearchRequest
+import me.muheun.moaspace.domain.vector.VectorEntityType
 import me.muheun.moaspace.dto.VectorSearchRequest
 import me.muheun.moaspace.repository.PostRepository
 import me.muheun.moaspace.repository.UserRepository
@@ -39,6 +39,9 @@ class VectorSearchServiceTest {
     private lateinit var vectorConfigRepository: VectorConfigRepository
 
     @Autowired
+    private lateinit var vectorTestHelper: me.muheun.moaspace.helper.VectorTestHelper
+
+    @Autowired
     private lateinit var entityManager: EntityManager
 
     private lateinit var testUser: User
@@ -59,25 +62,23 @@ class VectorSearchServiceTest {
             )
         )
 
-        vectorConfigRepository.save(
+        // VectorConfig 초기 데이터 생성 (namespace는 엔티티 기본값 "moaspace" 사용)
+        vectorConfigRepository.saveAll(listOf(
             VectorConfig(
-                entityType = "Post",
+                entityType = VectorEntityType.POST.typeName,
                 fieldName = "title",
                 weight = 3.0,
                 threshold = 0.0,
                 enabled = true
-            )
-        )
-        vectorConfigRepository.save(
+            ),
             VectorConfig(
-                entityType = "Post",
-                fieldName = "content",
+                entityType = VectorEntityType.POST.typeName,
+                fieldName = "contentText",
                 weight = 1.0,
                 threshold = 0.0,
                 enabled = true
             )
-        )
-
+        ))
         entityManager.flush()
         entityManager.clear()
     }
@@ -114,20 +115,20 @@ class VectorSearchServiceTest {
         )
 
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = postA.id.toString(),
             fields = mapOf(
                 "title" to postA.title,
-                "content" to postA.contentText
+                "contentText" to postA.contentText
             )
         )
 
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = postB.id.toString(),
             fields = mapOf(
                 "title" to postB.title,
-                "content" to postB.contentText
+                "contentText" to postB.contentText
             )
         )
 
@@ -138,8 +139,8 @@ class VectorSearchServiceTest {
         val results = vectorSearchService.search(
             VectorSearchRequest(
                 query = "Kotlin 성능 최적화",
-                namespace = "vector_ai",
-                entity = "Post",
+                namespace = vectorTestHelper.defaultNamespace,
+                entity = VectorEntityType.POST.typeName,
                 limit = 10
             )
         )
@@ -193,15 +194,15 @@ class VectorSearchServiceTest {
         )
 
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = post1.id.toString(),
-            fields = mapOf("title" to post1.title, "content" to post1.contentText)
+            fields = mapOf("title" to post1.title, "contentText" to post1.contentText)
         )
 
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = post2.id.toString(),
-            fields = mapOf("title" to post2.title, "content" to post2.contentText)
+            fields = mapOf("title" to post2.title, "contentText" to post2.contentText)
         )
 
         entityManager.flush()
@@ -211,8 +212,8 @@ class VectorSearchServiceTest {
         val results = vectorSearchService.search(
             VectorSearchRequest(
                 query = "Spring Boot 최적화",
-                namespace = "vector_ai",
-                entity = "Post",
+                namespace = vectorTestHelper.defaultNamespace,
+                entity = VectorEntityType.POST.typeName,
                 limit = 10
             )
         )
@@ -240,23 +241,28 @@ class VectorSearchServiceTest {
         )
 
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = post.id.toString(),
-            fields = mapOf("title" to post.title, "content" to post.contentText)
+            fields = mapOf("title" to post.title, "contentText" to post.contentText)
         )
 
         entityManager.flush()
         entityManager.clear()
 
         // when
-        val results = vectorSearchService.searchPosts(
-            PostSearchRequest(query = "JPA 최적화", limit = 10)
+        val results = vectorSearchService.search(
+            VectorSearchRequest(
+                query = "JPA 최적화",
+                namespace = vectorTestHelper.defaultNamespace,
+                entity = VectorEntityType.POST.typeName,
+                limit = 10
+            )
         )
 
         // then
         assertThat(results).isNotEmpty
-        assertThat(results).containsKey(post.id)
-        assertThat(results[post.id]).isGreaterThan(0.0)
+        assertThat(results).containsKey(post.id.toString())
+        assertThat(results[post.id.toString()]).isGreaterThan(0.0)
     }
 
     // ===========================
@@ -296,15 +302,15 @@ class VectorSearchServiceTest {
         )
 
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = highMatchPost.id.toString(),
-            fields = mapOf("title" to highMatchPost.title, "content" to highMatchPost.contentText)
+            fields = mapOf("title" to highMatchPost.title, "contentText" to highMatchPost.contentText)
         )
 
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = lowMatchPost.id.toString(),
-            fields = mapOf("title" to lowMatchPost.title, "content" to lowMatchPost.contentText)
+            fields = mapOf("title" to lowMatchPost.title, "contentText" to lowMatchPost.contentText)
         )
 
         entityManager.flush()
@@ -314,8 +320,8 @@ class VectorSearchServiceTest {
         val results = vectorSearchService.search(
             VectorSearchRequest(
                 query = "Kotlin 고급 기법 성능 최적화",
-                namespace = "vector_ai",
-                entity = "Post",
+                namespace = vectorTestHelper.defaultNamespace,
+                entity = VectorEntityType.POST.typeName,
                 limit = 10
             )
         )
@@ -362,15 +368,15 @@ class VectorSearchServiceTest {
         )
 
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = post1.id.toString(),
-            fields = mapOf("title" to post1.title, "content" to post1.contentText)
+            fields = mapOf("title" to post1.title, "contentText" to post1.contentText)
         )
 
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = post2.id.toString(),
-            fields = mapOf("title" to post2.title, "content" to post2.contentText)
+            fields = mapOf("title" to post2.title, "contentText" to post2.contentText)
         )
 
         entityManager.flush()
@@ -380,8 +386,8 @@ class VectorSearchServiceTest {
         val results = vectorSearchService.search(
             VectorSearchRequest(
                 query = "완전히 일치하는 키워드",
-                namespace = "vector_ai",
-                entity = "Post",
+                namespace = vectorTestHelper.defaultNamespace,
+                entity = VectorEntityType.POST.typeName,
                 limit = 10
             )
         )
@@ -416,9 +422,9 @@ class VectorSearchServiceTest {
             )
 
             vectorIndexingService.indexEntity(
-                entityType = "Post",
+                entityType = VectorEntityType.POST.typeName,
                 recordKey = post.id.toString(),
-                fields = mapOf("title" to post.title, "content" to post.contentText)
+                fields = mapOf("title" to post.title, "contentText" to post.contentText)
             )
         }
 
@@ -430,8 +436,8 @@ class VectorSearchServiceTest {
         val allFieldsResults = vectorSearchService.search(
             VectorSearchRequest(
                 query = "Kotlin 최적화",
-                namespace = "vector_ai",
-                entity = "Post",
+                namespace = vectorTestHelper.defaultNamespace,
+                entity = VectorEntityType.POST.typeName,
                 fieldName = null,
                 limit = 20
             )
@@ -442,8 +448,8 @@ class VectorSearchServiceTest {
         val titleOnlyResults = vectorSearchService.search(
             VectorSearchRequest(
                 query = "Kotlin 최적화",
-                namespace = "vector_ai",
-                entity = "Post",
+                namespace = vectorTestHelper.defaultNamespace,
+                entity = VectorEntityType.POST.typeName,
                 fieldName = "title",
                 limit = 20
             )
@@ -476,9 +482,9 @@ class VectorSearchServiceTest {
         )
 
         vectorIndexingService.indexEntity(
-            entityType = "Post",
+            entityType = VectorEntityType.POST.typeName,
             recordKey = post.id.toString(),
-            fields = mapOf("title" to post.title, "content" to post.contentText)
+            fields = mapOf("title" to post.title, "contentText" to post.contentText)
         )
 
         entityManager.flush()
@@ -488,8 +494,8 @@ class VectorSearchServiceTest {
         val results = vectorSearchService.search(
             VectorSearchRequest(
                 query = "Kotlin",
-                namespace = "vector_ai",
-                entity = "Post",
+                namespace = vectorTestHelper.defaultNamespace,
+                entity = VectorEntityType.POST.typeName,
                 fieldName = "title",
                 limit = 10
             )

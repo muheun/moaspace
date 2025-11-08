@@ -11,19 +11,10 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import java.util.UUID
 
-/**
- * Web MVC 설정 (CORS, MDC 필터 등)
- *
- * - CORS: 프론트엔드에서 백엔드 API 호출 허용
- * - MDC 필터: 요청별 고유 ID 및 메타정보 추적 (로그 추적 용이)
- */
+// CORS 및 요청 추적(MDC) 설정
 @Configuration
 class WebConfig : WebMvcConfigurer {
 
-    /**
-     * CORS 설정
-     * 프론트엔드(localhost:3000, localhost:3001 등)에서 백엔드 API 호출 허용
-     */
     override fun addCorsMappings(registry: CorsRegistry) {
         registry.addMapping("/api/**")  // /api/** 경로에 대해 CORS 허용
             .allowedOriginPatterns("*")  // 모든 origin 허용 (credentials와 함께 사용 가능)
@@ -33,19 +24,7 @@ class WebConfig : WebMvcConfigurer {
             .maxAge(3600)  // preflight 요청 캐시 시간 (1시간)
     }
 
-    /**
-     * MDC(Mapped Diagnostic Context) 필터 등록
-     *
-     * 모든 HTTP 요청에 대해 고유 ID를 생성하고 MDC에 저장하여,
-     * 로그 추적 및 분산 트레이싱을 지원합니다.
-     *
-     * **MDC 컨텍스트 키**:
-     * - `requestId`: 요청 고유 ID (UUID)
-     * - `remoteIp`: 클라이언트 IP 주소
-     * - `userAgent`: User-Agent 헤더
-     * - `method`: HTTP 메서드 (GET, POST 등)
-     * - `uri`: 요청 URI
-     */
+    // 요청 추적용 MDC 필터 - requestId, remoteIp, userAgent, method, uri 자동 설정
     @Bean
     fun mdcFilter() = object : OncePerRequestFilter() {
         override fun doFilterInternal(
@@ -74,11 +53,7 @@ class WebConfig : WebMvcConfigurer {
             }
         }
 
-        /**
-         * 클라이언트 실제 IP 주소 추출
-         *
-         * 프록시/로드 밸런서를 거쳐온 경우 X-Forwarded-For 헤더에서 추출
-         */
+        // 프록시 환경에서 실제 클라이언트 IP 추출 (X-Forwarded-For 우선)
         private fun getClientIp(request: HttpServletRequest): String {
             val xForwardedFor = request.getHeader("X-Forwarded-For")
             return if (!xForwardedFor.isNullOrBlank()) {

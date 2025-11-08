@@ -1,10 +1,12 @@
 package me.muheun.moaspace.service
 
+import me.muheun.moaspace.config.VectorProperties
 import me.muheun.moaspace.domain.post.Post
 import me.muheun.moaspace.domain.vector.VectorEntityType
 import me.muheun.moaspace.dto.CreatePostRequest
 import me.muheun.moaspace.dto.PostSearchRequest
 import me.muheun.moaspace.dto.UpdatePostRequest
+import me.muheun.moaspace.dto.VectorSearchRequest
 import me.muheun.moaspace.repository.PostRepository
 import me.muheun.moaspace.repository.UserRepository
 import org.jsoup.Jsoup
@@ -16,19 +18,18 @@ import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-// 게시글 서비스
 @Service
 @Transactional(readOnly = true)
 class PostService(
     private val postRepository: PostRepository,
     private val userRepository: UserRepository,
+    private val vectorProperties: VectorProperties,
     private val vectorIndexingService: VectorIndexingService,
     private val vectorSearchService: VectorSearchService
 ) {
 
     private val logger = LoggerFactory.getLogger(PostService::class.java)
 
-    // 게시글 생성 및 자동 벡터화
     @Transactional
     fun createPost(request: CreatePostRequest, userId: Long): Post {
         logger.info("게시글 생성 시작: userId=$userId, title=${request.title}")
@@ -76,6 +77,7 @@ class PostService(
         return hashtag.replace(Regex("<[^>]*>"), "").trim()
     }
 
+    // HTML → 마크다운 변환 (h1-h6, p, ul/ol, code, blockquote, img, link 등 지원)
     private fun convertHtmlToMarkdown(html: String): String {
         if (html.isBlank()) return ""
 
@@ -177,15 +179,7 @@ class PostService(
         return decoded.replace(Regex("\\s+"), " ").trim()
     }
 
-    /**
-     * 게시글 조회
-     *
-     * 삭제되지 않은 게시글만 반환합니다.
-     *
-     * @param postId 게시글 ID
-     * @return Post 엔티티
-     * @throws NoSuchElementException 게시글을 찾을 수 없거나 삭제된 경우
-     */
+    // 게시글 조회 (삭제되지 않은 글만 반환)
     fun getPostById(postId: Long): Post {
         logger.debug("게시글 조회: postId=$postId")
 
@@ -200,21 +194,6 @@ class PostService(
         return post
     }
 
-    /**
-     * 게시글 수정
-     *
-     * 1. 게시글 조회 (삭제되지 않은 글만)
-     * 2. 소유권 검증 (작성자 본인만 수정 가능)
-     * 3. Post 엔티티 업데이트
-     * 4. PostVectorService를 통해 벡터 재생성
-     *
-     * @param postId 게시글 ID
-     * @param request 게시글 수정 요청
-     * @param userId 요청자 ID (JWT에서 추출)
-     * @return 수정된 Post 엔티티
-     * @throws NoSuchElementException 게시글을 찾을 수 없을 경우
-     * @throws IllegalArgumentException 소유권이 없을 경우 (작성자 불일치)
-     */
     @Transactional
     fun updatePost(postId: Long, request: UpdatePostRequest, userId: Long): Post {
         logger.info("게시글 수정 시작: postId=$postId, userId=$userId")
@@ -292,11 +271,18 @@ class PostService(
         logger.info("게시글 소프트 삭제 완료: postId=$postId (deleted=true)")
     }
 
-    
+
     fun searchPosts(request: PostSearchRequest): List<Post> {
         logger.info("게시글 벡터 검색 시작: query=${request.query}, limit=${request.limit}")
 
-        val postScores = vectorSearchService.searchPosts(request)
+        val vectorRequest = VectorSearchRequest(
+            query = request.query,
+            namespace = vectorProperties.namespace,
+            entity = VectorEntityType.POST.typeName,
+            limit = request.limit
+        )
+
+        val postScores = vectorSearchService.search(vectorRequest)
         logger.debug("벡터 검색 결과: ${postScores.size}개 postId 반환")
 
         if (postScores.isEmpty()) {
@@ -304,7 +290,7 @@ class PostService(
             return emptyList()
         }
 
-        val postIds = postScores.keys.toList()
+        val postIds = postScores.keys.map { it.toLong() }
         val posts = postRepository.findAllById(postIds)
             .filter { !it.deleted }
             .associateBy { it.id }

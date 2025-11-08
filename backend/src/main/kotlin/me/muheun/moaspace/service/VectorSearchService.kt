@@ -1,6 +1,6 @@
 package me.muheun.moaspace.service
 
-import me.muheun.moaspace.dto.PostSearchRequest
+import me.muheun.moaspace.config.VectorProperties
 import me.muheun.moaspace.dto.VectorSearchRequest
 import me.muheun.moaspace.mapper.VectorChunkMapper
 import org.slf4j.LoggerFactory
@@ -10,15 +10,12 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(readOnly = true)
 class VectorSearchService(
+    private val vectorProperties: VectorProperties,
     private val vectorEmbeddingService: VectorEmbeddingService,
     private val vectorChunkMapper: VectorChunkMapper
 ) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
-
-    companion object {
-        const val DEFAULT_NAMESPACE = "vector_ai"
-    }
 
     /**
      * 범용 가중치 검색 (레코드별 최종 스코어 반환)
@@ -43,7 +40,7 @@ class VectorSearchService(
 
         val scores = vectorChunkMapper.findByWeightedFieldScore(
             queryVector = queryVector,
-            namespace = request.namespace ?: DEFAULT_NAMESPACE,
+            namespace = request.namespace ?: vectorProperties.namespace,
             entity = entity,
             limit = request.limit * 10
         )
@@ -61,22 +58,4 @@ class VectorSearchService(
         return recordScores
     }
 
-    /**
-     * Post 전용 가중치 검색 (PostSearchRequest 지원)
-     *
-     * @param request PostSearchRequest (query, threshold, limit)
-     * @return Map<Long, Double> (postId -> 최종 가중치 스코어)
-     */
-    fun searchPosts(request: PostSearchRequest): Map<Long, Double> {
-        val vectorRequest = VectorSearchRequest(
-            query = request.query,
-            namespace = DEFAULT_NAMESPACE,
-            entity = "Post",
-            fieldName = null,
-            fieldWeights = null,
-            limit = request.limit
-        )
-
-        return search(vectorRequest).mapKeys { it.key.toLong() }
-    }
 }

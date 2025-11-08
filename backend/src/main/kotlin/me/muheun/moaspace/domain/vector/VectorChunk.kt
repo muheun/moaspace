@@ -45,10 +45,6 @@ class VectorChunk(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,
 
-    // ========================================
-    // 범용 메타데이터 필드
-    // ========================================
-
     @Column(name = "namespace", nullable = false, length = 100)
     val namespace: String = "vector_ai",
 
@@ -60,10 +56,6 @@ class VectorChunk(
 
     @Column(name = "field_name", nullable = false, length = 100)
     val fieldName: String,
-
-    // ========================================
-    // 청크 내용
-    // ========================================
 
     @Column(name = "chunk_text", nullable = false, columnDefinition = "TEXT")
     val chunkText: String,
@@ -81,18 +73,9 @@ class VectorChunk(
     @Column(name = "end_position", nullable = false)
     val endPosition: Int,
 
-    // ========================================
-    // 추가 메타데이터 (JSONB)
-    // JSON Object 형식으로 저장
-    // ========================================
-
     @Column(name = "metadata", columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
     var metadata: Map<String, Any>? = null,
-
-    // ========================================
-    // 타임스탬프
-    // ========================================
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: LocalDateTime = LocalDateTime.now(),
@@ -100,17 +83,11 @@ class VectorChunk(
     @Column(name = "updated_at", nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
 ) {
-    /**
-     * 엔티티 업데이트 전 자동으로 updatedAt 갱신
-     */
     @PreUpdate
     fun onPreUpdate() {
         updatedAt = LocalDateTime.now()
     }
 
-    /**
-     * 디버깅용 문자열 표현
-     */
     override fun toString(): String {
         return "VectorChunk(" +
                 "id=$id, " +
@@ -124,18 +101,12 @@ class VectorChunk(
                 ")"
     }
 
-    /**
-     * 동일성 비교 (id 기반)
-     */
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is VectorChunk) return false
         return id != null && id == other.id
     }
 
-    /**
-     * 해시코드 (id 기반)
-     */
     override fun hashCode(): Int {
         return id?.hashCode() ?: 0
     }
